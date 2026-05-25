@@ -2,6 +2,7 @@
 
 /* Global dark background */
 .camera-screen {
+  position: relative;
   background-color: #0a0a0a;
   height: 100vh;
   display: flex;
@@ -163,6 +164,35 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Next button – pill shape */
+.next-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 64px;
+  height: 32px;
+  background: #fff;
+  color: #111;
+  font-weight: bold;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 14px;
+  z-index: 100;
+}
+
+/* Review screen placeholder */
+.review-screen {
+  background: #0a0a0a;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 24px;
+}
+
 
 /* Bottom navigation */
 .bottom-nav {

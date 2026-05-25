@@ -151,24 +151,34 @@ export default function CameraView() {
   const openTray = () => setShowTray(true);
   const closeTray = () => setShowTray(false);
   const removePhoto = idx => setPhotos(prev => prev.filter((_, i) => i !== idx));
+  // Review navigation state
+  const [showReview, setShowReview] = useState(false);
+  const goToReview = () => setShowReview(true);
+  if (showReview) {
+    return <div className="review-screen">Review</div>;
+  }
 
   // Open bottom sheet for effects/filters
   const openBottomSheet = () => {
     setShowSheet(true);
   };
-
   // Close bottom sheet
   const closeBottomSheet = () => {
     setShowSheet(false);
   };
+
 
   return (
     <div className="camera-screen">
       {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Viewfinder card */}
-      <div className="viewfinder-card">
+        {/* Next button (visible when photos exist) */}
+        {photos.length > 0 && (
+          <button className="next-btn" onClick={goToReview}>Next</button>
+        )}
+        {/* Viewfinder card */}
+        <div className="viewfinder-card">
         <video
           ref={videoRef}
           autoPlay
