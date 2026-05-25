@@ -22,6 +22,10 @@
 }
 
 .back-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
   background: #222;
   border: none;
   border-radius: 50%;
@@ -76,6 +80,8 @@
   align-items: center;
   padding: 0 16px;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .play-btn {
@@ -127,6 +133,12 @@
 .timeline-cell.selected {
   border: 2px solid #fff;
 }
+.timeline-cell.reordering {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  transition: transform 0.2s;
+}
 
 .thumb-img {
   width: 100%;
@@ -159,12 +171,22 @@
   opacity: 0.7;
 }
 
-/* Action bar */
+/* Action Area */
+.action-area {
+  display: flex;
+  flex-direction: column;
+  background: #111;
+  padding: 12px 16px 16px 16px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
 .action-bar {
   display: flex;
-  justify-content: space-around;
-  padding: 12px 0;
-  background: #111;
+  justify-content: space-between;
+  padding: 0;
+  background: transparent;
+  width: 100%;
 }
 
 .action-btn {
@@ -183,8 +205,17 @@
   font-weight: 500;
 }
 
-.export-btn {
-  background: #0a84ff;
+.export-pill-btn {
+  width: 100%;
+  background: #ffffff;
+  color: #000000;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 16px 0;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
 /* Responsive tweaks */

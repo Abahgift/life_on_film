@@ -15,7 +15,7 @@ const FILTERS = {
 
 const EFFECTS = ['None', 'Fish Eye', 'Chroma', 'Smear'];
 
-function CanvasEffectPreview({ src, effect, className }) {
+function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, className }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -26,7 +26,6 @@ function CanvasEffectPreview({ src, effect, className }) {
     img.crossOrigin = 'anonymous';
     img.src = src;
     img.onload = () => {
-      const maxDim = 320;
       let w = img.naturalWidth || img.width;
       let h = img.naturalHeight || img.height;
       if (w > maxDim || h > maxDim) {
@@ -42,10 +41,17 @@ function CanvasEffectPreview({ src, effect, className }) {
       canvas.height = h;
       ctx.clearRect(0, 0, w, h);
 
-      if (effect === 'None') {
-        ctx.drawImage(img, 0, 0, w, h);
-      } else if (effect === 'Fish Eye') {
-        ctx.drawImage(img, 0, 0, w, h);
+      // Apply the CSS filter first
+      const filterStr = FILTERS[filter] || 'none';
+      ctx.filter = filterStr;
+      
+      // Draw image to apply filter
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      // Reset filter so subsequent canvas operations don't get filtered again
+      ctx.filter = 'none';
+
+      if (effect === 'Fish Eye') {
         try {
           const imgData = ctx.getImageData(0, 0, w, h);
           const srcPix = imgData.data;
@@ -88,7 +94,6 @@ function CanvasEffectPreview({ src, effect, className }) {
           console.error(e);
         }
       } else if (effect === 'Chroma') {
-        ctx.drawImage(img, 0, 0, w, h);
         try {
           const imgData = ctx.getImageData(0, 0, w, h);
           const srcPix = imgData.data;
@@ -116,18 +121,25 @@ function CanvasEffectPreview({ src, effect, className }) {
           console.error(e);
         }
       } else if (effect === 'Smear') {
+        // Create an offscreen canvas to copy the filtered/drawn canvas contents
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(canvas, 0, 0);
+
         ctx.clearRect(0, 0, w, h);
         const steps = 6;
         const maxOffset = Math.round(w * 0.05);
         ctx.globalAlpha = 1.0 / steps;
         for (let i = 0; i < steps; i++) {
           const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
-          ctx.drawImage(img, offset, 0, w, h);
+          ctx.drawImage(tempCanvas, offset, 0, w, h);
         }
         ctx.globalAlpha = 1.0;
       }
     };
-  }, [src, effect]);
+  }, [src, effect, filter, maxDim]);
 
   return <canvas ref={canvasRef} className={className} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
 }
@@ -145,8 +157,10 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [effectsFiltersTab, setEffectsFiltersTab] = useState('Effect'); // 'Effect' or 'Filter'
   const [tempFilter, setTempFilter] = useState('None');
   const [tempEffect, setTempEffect] = useState('None');
+  const [reorderingIndex, setReorderingIndex] = useState(null);
   const playIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
+  const longPressTimeoutRef = useRef(null);
 
   // Sync orderedFrames when frames prop changes
   useEffect(() => {
@@ -241,13 +255,44 @@ export default function ReviewScreen({ frames = [], onBack }) {
     const touch = e.touches[0];
     touchDataRef.current = {
       startX: touch.clientX,
+      startY: touch.clientY,
       startIdx: idx,
+      activated: false,
     };
+
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+    }
+
+    longPressTimeoutRef.current = setTimeout(() => {
+      touchDataRef.current.activated = true;
+      setReorderingIndex(idx);
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500);
   };
 
   const handleTouchMove = e => {
     const touch = e.touches[0];
-    const { startX, startIdx } = touchDataRef.current;
+    const { startX, startIdx, activated } = touchDataRef.current;
+
+    if (!activated) {
+      const drift = Math.abs(touch.clientX - startX);
+      if (drift >= 10) {
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+          longPressTimeoutRef.current = null;
+        }
+      }
+      return;
+    }
+
+    // Prevent default scrolling on mobile when actively dragging
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+
     const deltaX = touch.clientX - startX;
     const threshold = 40; // pixels to trigger reorder
     if (Math.abs(deltaX) > threshold) {
@@ -258,7 +303,9 @@ export default function ReviewScreen({ frames = [], onBack }) {
         newOrder.splice(newIdx, 0, moved);
         setOrderedFrames(newOrder);
         setCurrentIndex(newIdx);
-        // reset to avoid multiple swaps in one gesture
+        setReorderingIndex(newIdx);
+        
+        // Reset starting point
         touchDataRef.current.startX = touch.clientX;
         touchDataRef.current.startIdx = newIdx;
       }
@@ -266,6 +313,11 @@ export default function ReviewScreen({ frames = [], onBack }) {
   };
 
   const handleTouchEnd = () => {
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+    setReorderingIndex(null);
     touchDataRef.current = {};
   };
 
@@ -296,18 +348,17 @@ export default function ReviewScreen({ frames = [], onBack }) {
   return (
     <div className="review-screen">
       {/* Top Bar */}
-      <div className="top-bar">
-                  <button className="back-btn" onClick={onBack}>←</button>
-      </div>
+      <button className="back-btn" onClick={onBack}>←</button>
 
       {/* Large Preview Card */}
       <div className="preview-card">
         {orderedFrames.length > 0 && (
-          <img 
+          <CanvasEffectPreview 
             src={orderedFrames[currentIndex]} 
-            alt="preview" 
+            effect={selectedEffect} 
+            filter={selectedFilter} 
+            maxDim={720} 
             className="preview-img" 
-            style={{ filter: FILTERS[selectedFilter] }} 
           />
         )}
         {/* Delete & Edit icons over the preview (bottom‑right) */}
@@ -338,12 +389,13 @@ export default function ReviewScreen({ frames = [], onBack }) {
         {orderedFrames.map((url, idx) => (
           <div
             key={idx}
-            className={`timeline-cell ${idx === currentIndex ? 'selected' : ''}`}
+            className={`timeline-cell ${idx === currentIndex ? 'selected' : ''} ${idx === reorderingIndex ? 'reordering' : ''}`}
             style={idx === currentIndex ? { border: '2px solid white' } : {}}
             onClick={() => setCurrentIndex(idx)}
             onTouchStart={e => handleTouchStart(e, idx)}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
           >
             <img src={url} alt={`thumb-${idx}`} className="thumb-img" />
             <button className="add-after-btn" onClick={e => { e.stopPropagation(); alert('Add after – placeholder'); }}>+</button>
@@ -353,25 +405,30 @@ export default function ReviewScreen({ frames = [], onBack }) {
         ))}
       </div>
 
-      {/* Action Buttons Row */}
-      <div className="action-bar">
-        <button className="action-btn" onClick={() => {
-          setTempFilter(selectedFilter);
-          setTempEffect(selectedEffect);
-          setEffectsFiltersTab('Effect');
-          setShowEffectsFiltersSheet(true);
-        }}>⭐<span>Effects</span></button>
-        <button className="action-btn" onClick={() => {
-          setTempFilter(selectedFilter);
-          setTempEffect(selectedEffect);
-          setEffectsFiltersTab('Filter');
-          setShowEffectsFiltersSheet(true);
-        }}>🌸<span>Filter</span></button>
-         <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
-           ⏳<span>Speed</span>
-         </button>
-        <button className="action-btn" onClick={placeholderAction('Music')}>🎵<span>Music</span></button>
-        <button className="action-btn export-btn" onClick={exportVideo}>⬆<span>Export</span></button>
+      {/* Action Area */}
+      <div className="action-area">
+        {/* Action Buttons Row */}
+        <div className="action-bar">
+          <button className="action-btn" onClick={() => {
+            setTempFilter(selectedFilter);
+            setTempEffect(selectedEffect);
+            setEffectsFiltersTab('Effect');
+            setShowEffectsFiltersSheet(true);
+          }}>⭐<span>Effects</span></button>
+          <button className="action-btn" onClick={() => {
+            setTempFilter(selectedFilter);
+            setTempEffect(selectedEffect);
+            setEffectsFiltersTab('Filter');
+            setShowEffectsFiltersSheet(true);
+          }}>🌸<span>Filter</span></button>
+           <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
+             ⏳<span>Speed</span>
+           </button>
+          <button className="action-btn" onClick={placeholderAction('Music')}>🎵<span>Music</span></button>
+        </div>
+
+        {/* Export Button */}
+        <button className="export-pill-btn" onClick={exportVideo}>Export</button>
       </div>
 
       {/* Speed Bottom Sheet */}
