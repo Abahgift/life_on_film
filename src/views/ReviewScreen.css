@@ -1,0 +1,199 @@
+/* ReviewScreen.css */
+
+/* Root container for the review screen */
+.review-screen {
+  position: relative;
+  background: #0a0a0a; /* deep dark background */
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+/* Top navigation bar */
+.top-bar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.back-btn {
+  background: #222;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* Large preview card */
+.preview-card {
+  position: relative;
+  flex: 0 0 55%;
+  margin: 12px 16px;
+  background: #111;
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-actions {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Playback row */
+.playback-row {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+}
+
+.play-btn {
+  background: #222;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.scrubber {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  outline: none;
+}
+.scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Timeline strip */
+.timeline-strip {
+  display: flex;
+  overflow-x: auto;
+  padding: 12px 16px;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.timeline-cell {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #222;
+  cursor: pointer;
+}
+.timeline-cell.selected {
+  border: 2px solid #fff;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.add-after-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+  line-height: 24px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Action bar */
+.action-bar {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  background: #111;
+}
+
+.action-btn {
+  background: #222;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.action-btn span {
+  font-weight: 500;
+}
+
+.export-btn {
+  background: #0a84ff;
+}
+
+/* Responsive tweaks */
+@media (max-width: 480px) {
+  .preview-card {
+    flex: 0 0 50%;
+  }
+  .timeline-cell {
+    width: 60px;
+    height: 60px;
+  }
+}

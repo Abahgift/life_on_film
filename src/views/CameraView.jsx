@@ -22,6 +22,7 @@ const effectCss = name => {
   }
 };
 import './CameraView.css';
+import ReviewScreen from './ReviewScreen';
 
 const MAX_PHOTOS = 10;
 
@@ -155,7 +156,7 @@ export default function CameraView() {
   const [showReview, setShowReview] = useState(false);
   const goToReview = () => setShowReview(true);
   if (showReview) {
-    return <div className="review-screen">Review</div>;
+    return <ReviewScreen frames={photos} onBack={() => setShowReview(false)} />;
   }
 
   // Open bottom sheet for effects/filters
