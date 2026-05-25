@@ -119,8 +119,9 @@ export default function CameraView() {
     canvas.toBlob(blob => {
       const url = URL.createObjectURL(blob);
       setPhotos(prev => {
-        const updated = [url, ...prev].slice(0, MAX_PHOTOS);
-        return updated;
+        const combined = [...prev, url];
+        // Keep at most MAX_PHOTOS, dropping oldest if needed
+        return combined.length > MAX_PHOTOS ? combined.slice(combined.length - MAX_PHOTOS) : combined;
       });
     }, 'image/jpeg');
   };
@@ -131,10 +132,11 @@ export default function CameraView() {
 
   const handleGalleryChange = e => {
     const files = Array.from(e.target.files);
-    const newUrls = files.slice(0, MAX_PHOTOS).map(f => URL.createObjectURL(f));
     setPhotos(prev => {
-      const combined = [...newUrls, ...prev].slice(0, MAX_PHOTOS);
-      return combined;
+      const space = MAX_PHOTOS - prev.length;
+      if (space <= 0) return prev;
+      const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
+      return [...prev, ...newUrls];
     });
     // Reset input value so same file can be selected again
     e.target.value = '';
@@ -144,6 +146,11 @@ export default function CameraView() {
   const toggleCamera = () => {
     setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
   };
+  // Photo tray state and helpers
+  const [showTray, setShowTray] = useState(false);
+  const openTray = () => setShowTray(true);
+  const closeTray = () => setShowTray(false);
+  const removePhoto = idx => setPhotos(prev => prev.filter((_, i) => i !== idx));
 
   // Open bottom sheet for effects/filters
   const openBottomSheet = () => {
@@ -269,20 +276,49 @@ export default function CameraView() {
       {/* Bottom row controls */}
       <div className="bottom-controls">
         {/* Left thumbnail */}
-        <div className="thumb-holder">
+        <div className="thumb-holder" onClick={openTray} style={{ position: 'relative', cursor: 'pointer' }}>
           {photos.length > 0 ? (
             <img src={photos[0]} alt="latest" className="thumb-img" />
           ) : (
             <div className="thumb-placeholder" />
           )}
+          {photos.length > 0 && (
+            <span className="badge">{photos.length}</span>
+          )}
         </div>
         {/* Shutter button */}
-        <button className="shutter-btn" onClick={capturePhoto} aria-label="Capture">
+        <button className="shutter-btn" onClick={capturePhoto} disabled={photos.length >= MAX_PHOTOS} aria-label="Capture">
           <div className="shutter-ring" />
         </button>
         {/* Vintage gallery button */}
         <button className="vintage-btn" onClick={openBottomSheet} title="Filters & Effects">📷</button>
       </div>
+        {/* Photo Tray Bottom Sheet */}
+        {showTray && (
+          <div className="sheet-backdrop" onClick={closeTray}>
+            <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
+              <div className="sheet-handle" />
+              <div className="tray-header">
+                <span className="tray-title">Your Photos</span>
+                <span className="tray-count">{photos.length} / {MAX_PHOTOS}</span>
+              </div>
+              <div className="photo-grid">
+                {photos.map((url, idx) => (
+                  <div className="photo-cell" key={idx}>
+                    <img src={url} className="grid-img" />
+                    <button className="remove-btn" onClick={() => removePhoto(idx)}>✕</button>
+                  </div>
+                ))}
+                {photos.length < MAX_PHOTOS && (
+                  <div className="add-more-cell" onClick={openGallery}>
+                    <span className="plus-icon">+</span>
+                  </div>
+                )}
+              </div>
+              <button className="done-btn" onClick={closeTray}>Done</button>
+            </div>
+          </div>
+        )}
 
       {/* Hidden file input for gallery */}
       <input
