@@ -44,10 +44,10 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
       // Apply the CSS filter first
       const filterStr = FILTERS[filter] || 'none';
       ctx.filter = filterStr;
-      
+
       // Draw image to apply filter
       ctx.drawImage(img, 0, 0, w, h);
-      
+
       // Reset filter so subsequent canvas operations don't get filtered again
       ctx.filter = 'none';
 
@@ -304,7 +304,7 @@ export default function ReviewScreen({ frames = [], onBack }) {
         setOrderedFrames(newOrder);
         setCurrentIndex(newIdx);
         setReorderingIndex(newIdx);
-        
+
         // Reset starting point
         touchDataRef.current.startX = touch.clientX;
         touchDataRef.current.startIdx = newIdx;
@@ -353,12 +353,12 @@ export default function ReviewScreen({ frames = [], onBack }) {
       {/* Large Preview Card */}
       <div className="preview-card">
         {orderedFrames.length > 0 && (
-          <CanvasEffectPreview 
-            src={orderedFrames[currentIndex]} 
-            effect={selectedEffect} 
-            filter={selectedFilter} 
-            maxDim={720} 
-            className="preview-img" 
+          <CanvasEffectPreview
+            src={orderedFrames[currentIndex]}
+            effect={selectedEffect}
+            filter={selectedFilter}
+            maxDim={720}
+            className="preview-img"
           />
         )}
         {/* Delete & Edit icons over the preview (bottom‑right) */}
@@ -414,17 +414,24 @@ export default function ReviewScreen({ frames = [], onBack }) {
             setTempEffect(selectedEffect);
             setEffectsFiltersTab('Effect');
             setShowEffectsFiltersSheet(true);
-          }}>⭐<span>Effects</span></button>
+          }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M9.15316 5.40838C10.4198 3.13613 11.0531 2 12 2C12.9469 2 13.5802 3.13612 14.8468 5.40837L15.1745 5.99623C15.5345 6.64193 15.7144 6.96479 15.9951 7.17781C16.2757 7.39083 16.6251 7.4699 17.3241 7.62805L17.9605 7.77203C20.4201 8.32856 21.65 8.60682 21.9426 9.54773C22.2352 10.4886 21.3968 11.4691 19.7199 13.4299L19.2861 13.9372C18.8096 14.4944 18.5713 14.773 18.4641 15.1177C18.357 15.4624 18.393 15.8341 18.465 16.5776L18.5306 17.2544C18.7841 19.8706 18.9109 21.1787 18.1449 21.7602C17.3788 22.3417 16.2273 21.8115 13.9243 20.7512L13.3285 20.4768C12.6741 20.1755 12.3469 20.0248 12 20.0248C11.6531 20.0248 11.3259 20.1755 10.6715 20.4768L10.0757 20.7512C7.77268 21.8115 6.62118 22.3417 5.85515 21.7602C5.08912 21.1787 5.21588 19.8706 5.4694 17.2544L5.53498 16.5776C5.60703 15.8341 5.64305 15.4624 5.53586 15.1177C5.42868 14.773 5.19043 14.4944 4.71392 13.9372L4.2801 13.4299C2.60325 11.4691 1.76482 10.4886 2.05742 9.54773C2.35002 8.60682 3.57986 8.32856 6.03954 7.77203L6.67589 7.62805C7.37485 7.4699 7.72433 7.39083 8.00494 7.17781C8.28555 6.96479 8.46553 6.64194 8.82547 5.99623L9.15316 5.40838Z" fill="white" /></svg>
+            <span>Effects</span>
+          </button>
           <button className="action-btn" onClick={() => {
             setTempFilter(selectedFilter);
             setTempEffect(selectedEffect);
             setEffectsFiltersTab('Filter');
             setShowEffectsFiltersSheet(true);
-          }}>🌸<span>Filter</span></button>
-           <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
-             ⏳<span>Speed</span>
-           </button>
-          <button className="action-btn" onClick={placeholderAction('Music')}>🎵<span>Music</span></button>
+          }}>            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M18 8C18 11.3137 15.3137 14 12 14C8.68629 14 6 11.3137 6 8C6 4.68629 8.68629 2 12 2C15.3137 2 18 4.68629 18 8Z" fill="white" /><path d="M5.03349 10.7834C3.22163 11.816 2 13.7653 2 16C2 19.3137 4.68629 22 8 22C11.3137 22 14 19.3137 14 16C14 15.7437 13.9839 15.4911 13.9527 15.2432C13.3301 15.4107 12.6755 15.5 12 15.5C8.84139 15.5 6.13882 13.5474 5.03349 10.7834Z" fill="white" /><path d="M15.3866 14.6936C15.4611 15.1179 15.5 15.5544 15.5 16C15.5 18.0906 14.6446 19.9815 13.2646 21.3416C14.0849 21.7625 15.0147 22 16 22C19.3137 22 22 19.3137 22 16C22 13.7653 20.7783 11.816 18.9665 10.7834C18.2876 12.4811 17.0062 13.8726 15.3866 14.6936Z" fill="white" /></svg>            <span>Filter</span>
+          </button>
+          <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
+            ⏳<span>Speed</span>
+          </button>
+          <button className="action-btn" onClick={placeholderAction('Music')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M10.0909 11.9629L19.3636 8.63087V14.1707C18.8126 13.8538 18.1574 13.67 17.4545 13.67C15.4964 13.67 13.9091 15.096 13.9091 16.855C13.9091 18.614 15.4964 20.04 17.4545 20.04C19.4126 20.04 21 18.614 21 16.855C21 16.8551 21 16.855L21 7.49236C21 6.37238 21 5.4331 20.9123 4.68472C20.8999 4.57895 20.8852 4.4738 20.869 4.37569C20.7845 3.86441 20.6352 3.38745 20.347 2.98917C20.2028 2.79002 20.024 2.61055 19.8012 2.45628C19.7594 2.42736 19.716 2.39932 19.6711 2.3722L19.6621 2.36679C18.8906 1.90553 18.0233 1.93852 17.1298 2.14305C16.2657 2.34086 15.1944 2.74368 13.8808 3.23763L11.5963 4.09656C10.9806 4.32806 10.4589 4.52419 10.0494 4.72734C9.61376 4.94348 9.23849 5.1984 8.95707 5.57828C8.67564 5.95817 8.55876 6.36756 8.50501 6.81203C8.4545 7.22978 8.45452 7.7378 8.45455 8.33743V16.1307C7.90347 15.8138 7.24835 15.63 6.54545 15.63C4.58735 15.63 3 17.056 3 18.815C3 20.574 4.58735 22 6.54545 22C8.50355 22 10.0909 20.574 10.0909 18.815C10.0909 18.8151 10.0909 18.815L10.0909 11.9629Z" fill="white" /></svg>
+            <span>Music</span>
+          </button>
         </div>
 
         {/* Export Button */}
@@ -436,7 +443,7 @@ export default function ReviewScreen({ frames = [], onBack }) {
         <div className="speed-sheet-overlay" onClick={() => setShowSpeedSheet(false)}>
           <div className="speed-sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" />
-            
+
             <div className="speed-preview-container">
               {orderedFrames.length > 0 && (
                 <img src={orderedFrames[currentIndex]} alt="speed-preview" className="speed-preview-img" />
@@ -480,16 +487,16 @@ export default function ReviewScreen({ frames = [], onBack }) {
         <div className="effects-filters-overlay" onClick={() => setShowEffectsFiltersSheet(false)}>
           <div className="effects-filters-sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" />
-            
+
             {/* Segmented Control */}
             <div className="segmented-control">
-              <button 
+              <button
                 className={`segment-btn ${effectsFiltersTab === 'Effect' ? 'active' : ''}`}
                 onClick={() => setEffectsFiltersTab('Effect')}
               >
                 Effect
               </button>
-              <button 
+              <button
                 className={`segment-btn ${effectsFiltersTab === 'Filter' ? 'active' : ''}`}
                 onClick={() => setEffectsFiltersTab('Filter')}
               >
@@ -501,17 +508,17 @@ export default function ReviewScreen({ frames = [], onBack }) {
             <div className="effects-filters-carousel">
               {effectsFiltersTab === 'Filter' ? (
                 Object.keys(FILTERS).map(filterName => (
-                  <div 
+                  <div
                     key={filterName}
                     className={`option-card ${tempFilter === filterName ? 'selected' : ''}`}
                     onClick={() => setTempFilter(filterName)}
                   >
                     {orderedFrames.length > 0 && (
-                      <img 
-                        src={orderedFrames[currentIndex]} 
-                        alt={filterName} 
-                        className="option-preview-img" 
-                        style={{ filter: FILTERS[filterName] }} 
+                      <img
+                        src={orderedFrames[currentIndex]}
+                        alt={filterName}
+                        className="option-preview-img"
+                        style={{ filter: FILTERS[filterName] }}
                       />
                     )}
                     <div className="option-card-overlay" />
@@ -520,16 +527,16 @@ export default function ReviewScreen({ frames = [], onBack }) {
                 ))
               ) : (
                 EFFECTS.map(effectName => (
-                  <div 
+                  <div
                     key={effectName}
                     className={`option-card ${tempEffect === effectName ? 'selected' : ''}`}
                     onClick={() => setTempEffect(effectName)}
                   >
                     {orderedFrames.length > 0 && (
-                      <CanvasEffectPreview 
-                        src={orderedFrames[currentIndex]} 
-                        effect={effectName} 
-                        className="option-preview-img" 
+                      <CanvasEffectPreview
+                        src={orderedFrames[currentIndex]}
+                        effect={effectName}
+                        className="option-preview-img"
                       />
                     )}
                     <div className="option-card-overlay" />
