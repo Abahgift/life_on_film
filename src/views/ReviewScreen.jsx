@@ -41,17 +41,10 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
       canvas.height = h;
       ctx.clearRect(0, 0, w, h);
 
-      // Apply the CSS filter first
-      const filterStr = FILTERS[filter] || 'none';
-      ctx.filter = filterStr;
-
-      // Draw image to apply filter
-      ctx.drawImage(img, 0, 0, w, h);
-
-      // Reset filter so subsequent canvas operations don't get filtered again
-      ctx.filter = 'none';
-
-      if (effect === 'Fish Eye') {
+      if (effect === 'None') {
+        ctx.drawImage(img, 0, 0, w, h);
+      } else if (effect === 'Fish Eye') {
+        ctx.drawImage(img, 0, 0, w, h);
         try {
           const imgData = ctx.getImageData(0, 0, w, h);
           const srcPix = imgData.data;
@@ -94,6 +87,7 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
           console.error(e);
         }
       } else if (effect === 'Chroma') {
+        ctx.drawImage(img, 0, 0, w, h);
         try {
           const imgData = ctx.getImageData(0, 0, w, h);
           const srcPix = imgData.data;
@@ -121,27 +115,31 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
           console.error(e);
         }
       } else if (effect === 'Smear') {
-        // Create an offscreen canvas to copy the filtered/drawn canvas contents
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = w;
-        tempCanvas.height = h;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(canvas, 0, 0);
-
         ctx.clearRect(0, 0, w, h);
         const steps = 6;
         const maxOffset = Math.round(w * 0.05);
         ctx.globalAlpha = 1.0 / steps;
         for (let i = 0; i < steps; i++) {
           const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
-          ctx.drawImage(tempCanvas, offset, 0, w, h);
+          ctx.drawImage(img, offset, 0, w, h);
         }
         ctx.globalAlpha = 1.0;
       }
     };
-  }, [src, effect, filter, maxDim]);
+  }, [src, effect, maxDim]);
 
-  return <canvas ref={canvasRef} className={className} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className={className}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        filter: FILTERS[filter] || 'none'
+      }}
+    />
+  );
 }
 
 // Props: frames (array of object URLs), onBack (function to return to Camera)
@@ -353,13 +351,22 @@ export default function ReviewScreen({ frames = [], onBack }) {
       {/* Large Preview Card */}
       <div className="preview-card">
         {orderedFrames.length > 0 && (
-          <CanvasEffectPreview
-            src={orderedFrames[currentIndex]}
-            effect={selectedEffect}
-            filter={selectedFilter}
-            maxDim={720}
-            className="preview-img"
-          />
+          selectedEffect === 'None' ? (
+            <img
+              src={orderedFrames[currentIndex]}
+              alt="preview"
+              className="preview-img"
+              style={{ filter: FILTERS[selectedFilter] }}
+            />
+          ) : (
+            <CanvasEffectPreview
+              src={orderedFrames[currentIndex]}
+              effect={selectedEffect}
+              filter={selectedFilter}
+              maxDim={720}
+              className="preview-img"
+            />
+          )
         )}
         {/* Delete & Edit icons over the preview (bottom‑right) */}
         <div className="preview-actions">
@@ -536,6 +543,7 @@ export default function ReviewScreen({ frames = [], onBack }) {
                       <CanvasEffectPreview
                         src={orderedFrames[currentIndex]}
                         effect={effectName}
+                        filter={tempFilter}
                         className="option-preview-img"
                       />
                     )}
