@@ -9,11 +9,24 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [speed, setSpeed] = useState(1); // seconds per frame
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
   const playIntervalRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Sync orderedFrames when frames prop changes
   useEffect(() => {
     setOrderedFrames(frames);
   }, [frames]);
+
+  const handleFileChange = e => {
+    const files = Array.from(e.target.files);
+    setOrderedFrames(prev => {
+      const space = 10 - prev.length;
+      if (space <= 0) return prev;
+      const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
+      return [...prev, ...newUrls];
+    });
+    // Reset input value so same file can be selected again
+    e.target.value = '';
+  };
 
   // Ensure speed state resets when frames length changes (optional)
   useEffect(() => {
@@ -179,7 +192,7 @@ export default function ReviewScreen({ frames = [], onBack }) {
       {/* Timeline Strip */}
       <div className="timeline-strip">
         {/* Add‑at‑start cell */}
-        <div className="timeline-cell add-start" onClick={() => alert('Add at start – placeholder')}>+</div>
+        <div className="timeline-cell add-start" onClick={() => fileInputRef.current && fileInputRef.current.click()}>+</div>
         {orderedFrames.map((url, idx) => (
           <div
             key={idx}
@@ -242,6 +255,16 @@ export default function ReviewScreen({ frames = [], onBack }) {
           </div>
         </div>
       )}
+
+      {/* Hidden file input for adding photos */}
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }
