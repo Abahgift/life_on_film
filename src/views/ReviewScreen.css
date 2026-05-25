@@ -195,5 +195,101 @@
   .timeline-cell {
     width: 60px;
     height: 60px;
-  }
+}
+
+/* Speed Bottom Sheet */
+.speed-sheet-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+
+.speed-sheet {
+  background: #1c1c1e;
+  width: 100%;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding: 16px 20px 32px 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: #555;
+  border-radius: 2px;
+  margin: 0 auto 20px auto;
+}
+
+.speed-preview-container {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 24px auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.speed-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.speed-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.speed-label {
+  font-weight: bold;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.speed-value {
+  color: #8e8e93;
+  font-size: 16px;
+}
+
+.speed-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  outline: none;
+  margin-bottom: 32px;
+}
+
+.speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.speed-done-btn {
+  width: 100%;
+  background: #ffffff;
+  color: #000000;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 16px 0;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
 }
