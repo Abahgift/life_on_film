@@ -1,6 +1,137 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ReviewScreen.css';
 
+const FILTERS = {
+  None: 'none',
+  Retro: 'sepia(60%) contrast(110%)',
+  Disposable: 'saturate(130%) hue-rotate(10deg)',
+  Vinyl: 'grayscale(30%) contrast(120%)',
+  Crisp: 'contrast(130%) brightness(105%)',
+  Mellow: 'brightness(110%) saturate(80%)',
+  Cassette: 'sepia(30%) contrast(90%)',
+  Insta: 'saturate(150%) brightness(105%)',
+  Autumn: 'sepia(40%) hue-rotate(330deg)'
+};
+
+const EFFECTS = ['None', 'Fish Eye', 'Chroma', 'Smear'];
+
+function CanvasEffectPreview({ src, effect, className }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = src;
+    img.onload = () => {
+      const maxDim = 320;
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.clearRect(0, 0, w, h);
+
+      if (effect === 'None') {
+        ctx.drawImage(img, 0, 0, w, h);
+      } else if (effect === 'Fish Eye') {
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const srcPix = imgData.data;
+          const outData = ctx.createImageData(w, h);
+          const outPix = outData.data;
+          const centerX = w / 2;
+          const centerY = h / 2;
+          const maxRadius = Math.min(centerX, centerY);
+
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const dx = x - centerX;
+              const dy = y - centerY;
+              const r = Math.sqrt(dx * dx + dy * dy);
+              if (r < maxRadius) {
+                const normR = r / maxRadius;
+                const distortR = Math.sin(normR * Math.PI / 2) * maxRadius;
+                const theta = Math.atan2(dy, dx);
+                const sx = Math.round(centerX + distortR * Math.cos(theta));
+                const sy = Math.round(centerY + distortR * Math.sin(theta));
+                if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
+                  const destIdx = (y * w + x) * 4;
+                  const srcIdx = (sy * w + sx) * 4;
+                  outPix[destIdx] = srcPix[srcIdx];
+                  outPix[destIdx + 1] = srcPix[srcIdx + 1];
+                  outPix[destIdx + 2] = srcPix[srcIdx + 2];
+                  outPix[destIdx + 3] = srcPix[srcIdx + 3];
+                }
+              } else {
+                const idx = (y * w + x) * 4;
+                outPix[idx] = srcPix[idx];
+                outPix[idx + 1] = srcPix[idx + 1];
+                outPix[idx + 2] = srcPix[idx + 2];
+                outPix[idx + 3] = srcPix[idx + 3];
+              }
+            }
+          }
+          ctx.putImageData(outData, 0, 0);
+        } catch (e) {
+          console.error(e);
+        }
+      } else if (effect === 'Chroma') {
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const srcPix = imgData.data;
+          const outData = ctx.createImageData(w, h);
+          const outPix = outData.data;
+          const offset = Math.round(w * 0.02);
+
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const idx = (y * w + x) * 4;
+              const rx = Math.max(0, x - offset);
+              const rIdx = (y * w + rx) * 4;
+              const gIdx = idx;
+              const bx = Math.min(w - 1, x + offset);
+              const bIdx = (y * w + bx) * 4;
+
+              outPix[idx] = srcPix[rIdx];
+              outPix[idx + 1] = srcPix[gIdx + 1];
+              outPix[idx + 2] = srcPix[bIdx + 2];
+              outPix[idx + 3] = srcPix[idx + 3];
+            }
+          }
+          ctx.putImageData(outData, 0, 0);
+        } catch (e) {
+          console.error(e);
+        }
+      } else if (effect === 'Smear') {
+        ctx.clearRect(0, 0, w, h);
+        const steps = 6;
+        const maxOffset = Math.round(w * 0.05);
+        ctx.globalAlpha = 1.0 / steps;
+        for (let i = 0; i < steps; i++) {
+          const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
+          ctx.drawImage(img, offset, 0, w, h);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+    };
+  }, [src, effect]);
+
+  return <canvas ref={canvasRef} className={className} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+}
+
 // Props: frames (array of object URLs), onBack (function to return to Camera)
 export default function ReviewScreen({ frames = [], onBack }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -8,6 +139,12 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [orderedFrames, setOrderedFrames] = useState(frames);
   const [speed, setSpeed] = useState(1); // seconds per frame
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('None');
+  const [selectedEffect, setSelectedEffect] = useState('None');
+  const [showEffectsFiltersSheet, setShowEffectsFiltersSheet] = useState(false);
+  const [effectsFiltersTab, setEffectsFiltersTab] = useState('Effect'); // 'Effect' or 'Filter'
+  const [tempFilter, setTempFilter] = useState('None');
+  const [tempEffect, setTempEffect] = useState('None');
   const playIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -166,7 +303,12 @@ export default function ReviewScreen({ frames = [], onBack }) {
       {/* Large Preview Card */}
       <div className="preview-card">
         {orderedFrames.length > 0 && (
-          <img src={orderedFrames[currentIndex]} alt="preview" className="preview-img" />
+          <img 
+            src={orderedFrames[currentIndex]} 
+            alt="preview" 
+            className="preview-img" 
+            style={{ filter: FILTERS[selectedFilter] }} 
+          />
         )}
         {/* Delete & Edit icons over the preview (bottom‑right) */}
         <div className="preview-actions">
@@ -213,8 +355,18 @@ export default function ReviewScreen({ frames = [], onBack }) {
 
       {/* Action Buttons Row */}
       <div className="action-bar">
-        <button className="action-btn" onClick={placeholderAction('Effects')}>⭐<span>Effects</span></button>
-        <button className="action-btn" onClick={placeholderAction('Filter')}>🌸<span>Filter</span></button>
+        <button className="action-btn" onClick={() => {
+          setTempFilter(selectedFilter);
+          setTempEffect(selectedEffect);
+          setEffectsFiltersTab('Effect');
+          setShowEffectsFiltersSheet(true);
+        }}>⭐<span>Effects</span></button>
+        <button className="action-btn" onClick={() => {
+          setTempFilter(selectedFilter);
+          setTempEffect(selectedEffect);
+          setEffectsFiltersTab('Filter');
+          setShowEffectsFiltersSheet(true);
+        }}>🌸<span>Filter</span></button>
          <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
            ⏳<span>Speed</span>
          </button>
@@ -265,6 +417,82 @@ export default function ReviewScreen({ frames = [], onBack }) {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
+
+      {/* Effects and Filters Bottom Sheet */}
+      {showEffectsFiltersSheet && (
+        <div className="effects-filters-overlay" onClick={() => setShowEffectsFiltersSheet(false)}>
+          <div className="effects-filters-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            
+            {/* Segmented Control */}
+            <div className="segmented-control">
+              <button 
+                className={`segment-btn ${effectsFiltersTab === 'Effect' ? 'active' : ''}`}
+                onClick={() => setEffectsFiltersTab('Effect')}
+              >
+                Effect
+              </button>
+              <button 
+                className={`segment-btn ${effectsFiltersTab === 'Filter' ? 'active' : ''}`}
+                onClick={() => setEffectsFiltersTab('Filter')}
+              >
+                Filter
+              </button>
+            </div>
+
+            {/* Carousel */}
+            <div className="effects-filters-carousel">
+              {effectsFiltersTab === 'Filter' ? (
+                Object.keys(FILTERS).map(filterName => (
+                  <div 
+                    key={filterName}
+                    className={`option-card ${tempFilter === filterName ? 'selected' : ''}`}
+                    onClick={() => setTempFilter(filterName)}
+                  >
+                    {orderedFrames.length > 0 && (
+                      <img 
+                        src={orderedFrames[currentIndex]} 
+                        alt={filterName} 
+                        className="option-preview-img" 
+                        style={{ filter: FILTERS[filterName] }} 
+                      />
+                    )}
+                    <div className="option-card-overlay" />
+                    <span className="option-name">{filterName}</span>
+                  </div>
+                ))
+              ) : (
+                EFFECTS.map(effectName => (
+                  <div 
+                    key={effectName}
+                    className={`option-card ${tempEffect === effectName ? 'selected' : ''}`}
+                    onClick={() => setTempEffect(effectName)}
+                  >
+                    {orderedFrames.length > 0 && (
+                      <CanvasEffectPreview 
+                        src={orderedFrames[currentIndex]} 
+                        effect={effectName} 
+                        className="option-preview-img" 
+                      />
+                    )}
+                    <div className="option-card-overlay" />
+                    <span className="option-name">{effectName}</span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Done Button */}
+            <button className="effects-filters-done-btn" onClick={() => {
+              setSelectedFilter(tempFilter);
+              setSelectedEffect(tempEffect);
+              setShowEffectsFiltersSheet(false);
+            }}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
