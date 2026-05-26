@@ -30,7 +30,7 @@ function FilmFrameOverlay({ frameIndex }) {
           height: '6px',
           backgroundColor: '#2a1f0e',
           borderRadius: '2px',
-          margin: '10px auto'
+          margin: '0 auto 20px auto'
         }}
       />
     ))
@@ -331,6 +331,20 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const playIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
   const longPressTimeoutRef = useRef(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [audioURL, setAudioURL] = useState('');
+
+  // Music sheet state
+  const [selectedAudio, setSelectedAudio] = useState(null);
+  const [audioStartTime, setAudioStartTime] = useState(0);
+  const [audioEndTime, setAudioEndTime] = useState(0);
+  const [showMusicSheet, setShowMusicSheet] = useState(false);
+  const audioInputRef = useRef(null);
+  const audioRef = useRef(null);
+        const [audioDuration, setAudioDuration] = useState(0);
+const [audioError, setAudioError] = useState('');
+
+
 
   // Sync orderedFrames when frames prop changes
   useEffect(() => {
@@ -349,16 +363,100 @@ export default function ReviewScreen({ frames = [], onBack }) {
   }, [selectedEffect, showEffectsFiltersSheet, tempEffect]);
 
   const handleFileChange = e => {
-    const files = Array.from(e.target.files);
-    setOrderedFrames(prev => {
-      const space = 10 - prev.length;
-      if (space <= 0) return prev;
-      const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
-      return [...prev, ...newUrls];
+  const files = Array.from(e.target.files);
+  setOrderedFrames(prev => {
+    const space = 10 - prev.length;
+    if (space <= 0) return prev;
+    const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
+    return [...prev, ...newUrls];
+  });
+  // Reset input value so same file can be selected again
+  e.target.value = '';
+};
+
+// Audio file selection handler
+const handleAudioSelect = e => {
+  try {
+    const file = e.target.files[0];
+    if (!file) return;
+    // Validate file type for audio
+    const allowedExt = ['mp3', 'm4a', 'aac', 'wav', 'ogg'];
+    const mimeValid = file.type && file.type.startsWith('audio/');
+    const ext = file.name.split('.').pop().toLowerCase();
+    const extValid = allowedExt.includes(ext);
+    if (!mimeValid && !extValid) {
+      setAudioError('Please select an audio file (MP3, M4A, AAC, WAV)');
+      e.target.value = '';
+      return;
+    }
+    setAudioError('');
+    setSelectedAudio(file);
+    const url = URL.createObjectURL(file);
+    setAudioURL(url);
+    // Reset trim times
+    setAudioStartTime(0);
+    setAudioEndTime(0);
+    // Load duration
+    const tempAudio = new Audio(url);
+    tempAudio.addEventListener('loadedmetadata', () => {
+      setAudioDuration(tempAudio.duration);
+      setAudioEndTime(tempAudio.duration);
     });
-    // Reset input value so same file can be selected again
+  } catch (err) {
+    console.error(err);
+    setAudioError('Error loading audio file');
     e.target.value = '';
-  };
+  }
+};
+
+// Helper to format seconds to m:ss
+const formatTime = secs => {
+  const minutes = Math.floor(secs / 60);
+  const seconds = Math.round(secs % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// Trim range handlers
+const handleTrimStartChange = e => {
+  const val = parseFloat(e.target.value);
+  if (val <= audioEndTime) setAudioStartTime(val);
+};
+
+const handleTrimEndChange = e => {
+  const val = parseFloat(e.target.value);
+  if (val >= audioStartTime) setAudioEndTime(val);
+};
+
+// Playback control for audio preview
+useEffect(() => {
+  if (isAudioPlaying && audioRef.current) {
+    audioRef.current.play();
+  } else if (audioRef.current) {
+    audioRef.current.pause();
+  }
+}, [isAudioPlaying, audioURL]);
+
+const toggleAudioPlay = () => {
+  setIsAudioPlaying(p => !p);
+};
+
+// Remove selected audio
+const removeAudio = () => {
+  setSelectedAudio(null);
+  setAudioURL('');
+  setAudioDuration(0);
+  setAudioStartTime(0);
+  setAudioEndTime(0);
+  setIsAudioPlaying(false);
+};
+
+// Ensure playback stops when sheet is closed
+useEffect(() => {
+  if (!showMusicSheet && audioRef.current) {
+    audioRef.current.pause();
+    setIsAudioPlaying(false);
+  }
+}, [showMusicSheet]);
 
   // Ensure speed state resets when frames length changes (optional)
   useEffect(() => {
@@ -524,7 +622,11 @@ export default function ReviewScreen({ frames = [], onBack }) {
 
   // UI action placeholders
   const placeholderAction = label => () => alert(`${label} – Coming soon`);
-  const exportVideo = () => console.log('Export flow placeholder – frames:', orderedFrames);
+  // Export function placeholder – frames will be mixed with audio later
+const exportVideo = () => {
+  console.log('Export flow placeholder – frames:', orderedFrames);
+  // TODO: mix selectedAudio from audioStartTime to audioEndTime using ffmpeg -i audio.mp3 -ss audioStartTime -t duration
+};
 
   const activeFilter = showEffectsFiltersSheet ? tempFilter : selectedFilter;
   const activeEffect = showEffectsFiltersSheet ? tempEffect : selectedEffect;
@@ -551,6 +653,65 @@ export default function ReviewScreen({ frames = [], onBack }) {
           from { transform: scale(0.8); }
           to { transform: scale(1.0); }
         }
+        /* Music bottom sheet styles */
+        .music-sheet-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+        }
+        .music-sheet {
+          background: #1c1c1e;
+          width: 100%;
+          border-top-left-radius: 20px;
+          border-top-right-radius: 20px;
+          padding: 16px 20px 32px 20px;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+        }
+        .sheet-handle {
+          width: 36px;
+          height: 4px;
+          background: #555;
+          border-radius: 2px;
+          margin: 8px auto;
+        }
+
+        .music-sheet .sheet-title {
+          text-align: center;
+          color: #fff;
+          font-weight: bold;
+          margin: 12px 0;
+        }
+        .music-upload-area {
+          background: #1c1c1e;
+          border-radius: 16px;
+          height: 100px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #8e8e93;
+          cursor: pointer;
+        }
+        .music-note-icon {font-size: 32px; margin-bottom: 8px;}
+        .upload-text {font-size: 14px;}
+        .music-selected .audio-file-name {display: flex; justify-content: space-between; color: #fff;}
+        .remove-audio-btn {background: none; border: none; color: #fff; cursor: pointer;}
+        .playback-preview {display: flex; align-items: center; gap: 8px; margin: 8px 0;}
+        .trim-section {margin-top: 12px;}
+        .trim-label {color: #8e8e93; font-size: 12px; margin-bottom: 4px;}
+        .trim-handle {width: 100%;}
+        .trim-duration {color: #8e8e93; font-size: 12px; margin-top: 4px;}
+        .done-btn {width: 100%; background: #fff; color: #000; font-weight: bold; font-size: 16px; padding: 16px 0; border: none; border-radius: 24px; cursor: pointer; margin-top: 12px;}
+        .music-indicator {display: block; width: 6px; height: 6px; background: #fff; border-radius: 50%; margin: 4px auto 0;}
+        .error-message {color: #ff6b6b; margin-top: 8px; font-size: 12px;}
       `}</style>
 
       {/* Top Bar */}
@@ -670,9 +831,10 @@ export default function ReviewScreen({ frames = [], onBack }) {
           <button className="action-btn" onClick={() => setShowSpeedSheet(true)}>
             ⏳<span>Speed</span>
           </button>
-          <button className="action-btn" onClick={placeholderAction('Music')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M10.0909 11.9629L19.3636 8.63087V14.1707C18.8126 13.8538 18.1574 13.67 17.4545 13.67C15.4964 13.67 13.9091 15.096 13.9091 16.855C13.9091 18.614 15.4964 20.04 17.4545 20.04C19.4126 20.04 21 18.614 21 16.855C21 16.8551 21 16.855L21 7.49236C21 6.37238 21 5.4331 20.9123 4.68472C20.8999 4.57895 20.8852 4.4738 20.869 4.37569C20.7845 3.86441 20.6352 3.38745 20.347 2.98917C20.2028 2.79002 20.024 2.61055 19.8012 2.45628C19.7594 2.42736 19.716 2.39932 19.6711 2.3722L19.6621 2.36679C18.8906 1.90553 18.0233 1.93852 17.1298 2.14305C16.2657 2.34086 15.1944 2.74368 13.8808 3.23763L11.5963 4.09656C10.9806 4.32806 10.4589 4.52419 10.0494 4.72734C9.61376 4.94348 9.23849 5.1984 8.95707 5.57828C8.67564 5.95817 8.55876 6.36756 8.50501 6.81203C8.4545 7.22978 8.45452 7.7378 8.45455 8.33743V16.1307C7.90347 15.8138 7.24835 15.63 6.54545 15.63C4.58735 15.63 3 17.056 3 18.815C3 20.574 4.58735 22 6.54545 22C8.50355 22 10.0909 20.574 10.0909 18.815C10.0909 18.8151 10.0909 18.815L10.0909 11.9629Z" fill="white" /></svg>
-            <span>Music</span>
+          <button className="action-btn" onClick={() => { setShowMusicSheet(true); }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M10.0909 11.9629L19.3636 8.63087V14.1707C18.8126 13.8538 18.1574 13.67 17.4545 13.67C15.4964 13.67 13.9091 15.096 13.9091 16.855C13.9091 18.614 15.4964 20.04 17.4545 20.04C19.4126 20.04 21 18.614 21 16.855C21 16.8551 21 16.855L21 7.49236C21 6.37238 21 5.4331 20.9123 4.68472C20.8999 4.57895 20.8852 4.4738 20.869 4.37569C20.7845 3.86441 20.6352 3.38745 20.347 2.98917C20.2028 2.79002 20.024 2.61055 19.8012 2.45628C19.7594 2.42736 19.716 2.39932 19.6711 2.3722L19.6621 2.36679C18.8906 1.90553 18.0233 1.93852 17.1298 2.14305C16.2657 2.34086 15.1944 2.74368 13.8808 3.23763L11.5963 4.09656C10.9806 4.32806 10.4589 4.52419 10.0494 4.72734C9.61376 4.94348 9.23849 5.1984 8.95707 5.57828C8.67564 5.95817 8.55876 6.36756 8.50501 6.81203C8.4545 7.22978 8.45452 7.7378 8.45455 8.33743V16.1307C7.90347 15.8138 7.24835 15.63 6.54545 15.63C4.58735 15.63 3 17.056 3 18.815C3 20.574 4.58735 22 6.54545 22C8.50355 22 10.0909 20.574 10.0909 18.815C10.0909 18.8151 10.0909 18.815L10.0909 11.9629Z" fill="white" /></svg>
+              <span>Music</span>
+              {selectedAudio && <span className="music-indicator"></span>}
           </button>
         </div>
 
@@ -680,7 +842,44 @@ export default function ReviewScreen({ frames = [], onBack }) {
         <button className="export-pill-btn" onClick={exportVideo}>Export</button>
       </div>
 
-      {/* Speed Bottom Sheet */}
+      {/* Music Bottom Sheet */}
+{showMusicSheet && (
+  <div className="music-sheet-overlay" onClick={() => setShowMusicSheet(false)}>
+    <div className="music-sheet" onClick={e => e.stopPropagation()}>
+      <div className="sheet-handle" />
+      <div className="sheet-title">Add Music</div>
+      {!selectedAudio ? (
+        <div className="music-upload-area" onClick={() => audioInputRef.current && audioInputRef.current.click()}>
+          <div className="music-note-icon">🎵</div>
+          <div className="upload-text">Tap to select audio</div>
+        </div>
+      ) : (
+        <div className="music-selected">
+          <div className="audio-file-name">
+            <span>{selectedAudio.name.length > 20 ? selectedAudio.name.slice(0, 17) + '…' : selectedAudio.name}</span>
+            <button className="remove-audio-btn" onClick={removeAudio}>✕</button>
+          </div>
+          <div className="playback-preview">
+            <button onClick={toggleAudioPlay}>{isAudioPlaying ? '⏸' : '▶'}</button>
+            <span>{formatTime(audioStartTime)} - {formatTime(audioEndTime)}</span>
+          </div>
+          <div className="trim-section">
+            <div className="trim-label">Trim Start</div>
+            <input type="range" min={0} max={audioDuration} step={0.1} value={audioStartTime} className="trim-handle" onChange={handleTrimStartChange} />
+            <div className="trim-label">Trim End</div>
+            <input type="range" min={0} max={audioDuration} step={0.1} value={audioEndTime} className="trim-handle" onChange={handleTrimEndChange} />
+            <div className="trim-duration">{formatTime(audioEndTime - audioStartTime)} selected</div>
+          </div>
+        </div>
+      )}
+      {audioError && <div className="error-message">{audioError}</div>}
+      <button className="done-btn" onClick={() => setShowMusicSheet(false)}>Done</button>
+      <input type="file" accept="audio/mpeg,audio/mp3,audio/aac,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,.mp3,.m4a,.aac,.wav,.ogg" ref={audioInputRef} style={{ display: 'none' }} onChange={handleAudioSelect} />
+      <audio ref={audioRef} src={audioURL} style={{ display: 'none' }} />
+    </div>
+  </div>
+)}
+{/* Speed Bottom Sheet */}
       {showSpeedSheet && (
         <div className="speed-sheet-overlay" onClick={() => setShowSpeedSheet(false)}>
           <div className="speed-sheet" onClick={e => e.stopPropagation()}>
@@ -820,10 +1019,13 @@ export default function ReviewScreen({ frames = [], onBack }) {
 
             {/* Done Button */}
             <button className="effects-filters-done-btn" onClick={() => {
-              setSelectedFilter(tempFilter);
-              setSelectedEffect(tempEffect);
-              setShowEffectsFiltersSheet(false);
-            }}>
+                if (effectsFiltersTab === 'Filter') {
+                  setSelectedFilter(tempFilter);
+                } else {
+                  setSelectedEffect(tempEffect);
+                }
+                setShowEffectsFiltersSheet(false);
+              }}>
               Done
             </button>
           </div>
