@@ -13,9 +13,179 @@ const FILTERS = {
   Autumn: 'sepia(40%) hue-rotate(330deg)'
 };
 
-const EFFECTS = ['None', 'Fish Eye', 'Chroma', 'Smear'];
+const EFFECTS = ['None', 'Fish Eye', 'Chroma', 'Smear', 'Slow Zoom', 'Fast Zoom', 'Film Frame', 'Film Grain'];
 
-function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, className }) {
+const FILM_GRAIN_FREQUENCIES = [
+  '0.63 0.63', '0.64 0.64', '0.65 0.65', '0.66 0.66', '0.67 0.67',
+  '0.64 0.64', '0.65 0.65', '0.66 0.66', '0.65 0.65', '0.66 0.66'
+];
+
+function FilmFrameOverlay({ frameIndex }) {
+  const renderPerforations = () => (
+    Array.from({ length: 3 }).map((_, i) => (
+      <div
+        key={i}
+        style={{
+          width: '12px',
+          height: '6px',
+          backgroundColor: '#2a1f0e',
+          borderRadius: '2px',
+          margin: '10px auto'
+        }}
+      />
+    ))
+  );
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      pointerEvents: 'none',
+      zIndex: 2,
+      display: 'flex',
+      justifyContent: 'space-between',
+      width: '100%',
+      height: '100%',
+      boxSizing: 'border-box'
+    }}>
+      {/* Left strip */}
+      <div style={{
+        position: 'relative',
+        width: '22px',
+        height: '100%',
+        backgroundColor: '#1a1008',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '10px 0'
+      }}>
+        {/* Top Perforations */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {renderPerforations()}
+        </div>
+
+        {/* Golden text & number */}
+        <span style={{
+          position: 'absolute',
+          top: '40%',
+          left: '50%',
+          transform: 'translate(-50%, -50%) rotate(180deg)',
+          color: '#c8a96e',
+          fontSize: '9px',
+          letterSpacing: '2px',
+          fontFamily: '"Courier New", monospace',
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          whiteSpace: 'nowrap'
+        }}>
+          KODAK PORTRA 400
+        </span>
+
+        <span style={{
+          position: 'absolute',
+          bottom: '75px',
+          left: '50%',
+          transform: 'translateX(-50%) rotate(180deg)',
+          color: '#c8a96e',
+          fontSize: '9px',
+          fontFamily: '"Courier New", monospace',
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          whiteSpace: 'nowrap'
+        }}>
+          43
+        </span>
+
+        {/* Bottom Perforations */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {renderPerforations()}
+        </div>
+      </div>
+
+      {/* Right strip */}
+      <div style={{
+        position: 'relative',
+        width: '22px',
+        height: '100%',
+        backgroundColor: '#1a1008',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '10px 0'
+      }}>
+        {/* Top Perforations */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {renderPerforations()}
+        </div>
+
+        {/* Golden text & number */}
+        <span style={{
+          position: 'absolute',
+          top: '40%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: '#c8a96e',
+          fontSize: '9px',
+          letterSpacing: '2px',
+          fontFamily: '"Courier New", monospace',
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          whiteSpace: 'nowrap'
+        }}>
+          KODAK PORTRA 400
+        </span>
+
+        <span style={{
+          position: 'absolute',
+          bottom: '75px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: '#c8a96e',
+          fontSize: '9px',
+          fontFamily: '"Courier New", monospace',
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          whiteSpace: 'nowrap'
+        }}>
+          2
+        </span>
+
+        {/* Bottom Perforations */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {renderPerforations()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilmGrainOverlay() {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      pointerEvents: 'none',
+      zIndex: 3,
+      overflow: 'hidden',
+      width: '100%',
+      height: '100%'
+    }}>
+      <svg style={{ width: '100%', height: '100%', opacity: 0.35 }}>
+        <rect width="100%" height="100%" filter="url(#global-film-grain-filter)" />
+      </svg>
+    </div>
+  );
+}
+
+function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, className, style }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -41,7 +211,7 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
       canvas.height = h;
       ctx.clearRect(0, 0, w, h);
 
-      if (effect === 'None') {
+      if (effect === 'None' || effect === 'Slow Zoom' || effect === 'Fast Zoom' || effect === 'Film Frame' || effect === 'Film Grain') {
         ctx.drawImage(img, 0, 0, w, h);
       } else if (effect === 'Fish Eye') {
         ctx.drawImage(img, 0, 0, w, h);
@@ -136,7 +306,8 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
         width: '100%',
         height: '100%',
         objectFit: 'cover',
-        filter: FILTERS[filter] || 'none'
+        filter: FILTERS[filter] || 'none',
+        ...style
       }}
     />
   );
@@ -156,6 +327,7 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [tempFilter, setTempFilter] = useState('None');
   const [tempEffect, setTempEffect] = useState('None');
   const [reorderingIndex, setReorderingIndex] = useState(null);
+  const [grainSeed, setGrainSeed] = useState(0);
   const playIntervalRef = useRef(null);
   const fileInputRef = useRef(null);
   const longPressTimeoutRef = useRef(null);
@@ -164,6 +336,17 @@ export default function ReviewScreen({ frames = [], onBack }) {
   useEffect(() => {
     setOrderedFrames(frames);
   }, [frames]);
+
+  // Animate Film Grain base frequency seed
+  useEffect(() => {
+    const isGrainActive = selectedEffect === 'Film Grain' || (showEffectsFiltersSheet && tempEffect === 'Film Grain');
+    if (isGrainActive) {
+      const interval = setInterval(() => {
+        setGrainSeed(prev => (prev + 1) % 10);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [selectedEffect, showEffectsFiltersSheet, tempEffect]);
 
   const handleFileChange = e => {
     const files = Array.from(e.target.files);
@@ -343,31 +526,83 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const placeholderAction = label => () => alert(`${label} – Coming soon`);
   const exportVideo = () => console.log('Export flow placeholder – frames:', orderedFrames);
 
+  const activeFilter = showEffectsFiltersSheet ? tempFilter : selectedFilter;
+  const activeEffect = showEffectsFiltersSheet ? tempEffect : selectedEffect;
+  const isCanvasRequired = ['Fish Eye', 'Chroma', 'Smear'].includes(activeEffect);
+
   return (
     <div className="review-screen">
+      {/* Global Film Grain Filter Definition */}
+      <svg style={{ display: 'none' }}>
+        <defs>
+          <filter id="global-film-grain-filter">
+            <feTurbulence type="fractalNoise" baseFrequency={FILM_GRAIN_FREQUENCIES[grainSeed]} numOctaves="3" stitchTiles="stitch" />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* Global Zoom Styles */}
+      <style>{`
+        @keyframes slow-zoom-anim {
+          from { transform: scale(0.8); }
+          to { transform: scale(1.0); }
+        }
+        @keyframes fast-zoom-anim {
+          from { transform: scale(0.8); }
+          to { transform: scale(1.0); }
+        }
+      `}</style>
+
       {/* Top Bar */}
       <button className="back-btn" onClick={onBack}>←</button>
 
       {/* Large Preview Card */}
       <div className="preview-card">
         {orderedFrames.length > 0 && (
-          selectedEffect === 'None' ? (
+          !isCanvasRequired ? (
             <img
+              key={currentIndex}
               src={orderedFrames[currentIndex]}
               alt="preview"
               className="preview-img"
-              style={{ filter: FILTERS[selectedFilter] }}
+              style={{
+                filter: FILTERS[activeFilter] || 'none',
+                animation: activeEffect === 'Slow Zoom'
+                  ? `slow-zoom-anim ${speed}s ease-out forwards`
+                  : activeEffect === 'Fast Zoom'
+                    ? `fast-zoom-anim 0.3s ease-out forwards`
+                    : 'none'
+              }}
             />
           ) : (
             <CanvasEffectPreview
+              key={currentIndex}
               src={orderedFrames[currentIndex]}
-              effect={selectedEffect}
-              filter={selectedFilter}
+              effect={activeEffect}
+              filter={activeFilter}
               maxDim={720}
               className="preview-img"
+              style={{
+                animation: activeEffect === 'Slow Zoom'
+                  ? `slow-zoom-anim ${speed}s ease-out forwards`
+                  : activeEffect === 'Fast Zoom'
+                    ? `fast-zoom-anim 0.3s ease-out forwards`
+                    : 'none'
+              }}
             />
           )
         )}
+        
+        {/* Render Film Frame Overlay if activeEffect is 'Film Frame' */}
+        {activeEffect === 'Film Frame' && (
+          <FilmFrameOverlay frameIndex={currentIndex} />
+        )}
+
+        {/* Render Film Grain Overlay if activeEffect is 'Film Grain' */}
+        {activeEffect === 'Film Grain' && (
+          <FilmGrainOverlay />
+        )}
+
         {/* Delete & Edit icons over the preview (bottom‑right) */}
         <div className="preview-actions">
           <button className="icon-btn delete-btn" title="Delete" onClick={() => handleDelete(currentIndex)}>✕</button>
@@ -533,24 +768,53 @@ export default function ReviewScreen({ frames = [], onBack }) {
                   </div>
                 ))
               ) : (
-                EFFECTS.map(effectName => (
-                  <div
-                    key={effectName}
-                    className={`option-card ${tempEffect === effectName ? 'selected' : ''}`}
-                    onClick={() => setTempEffect(effectName)}
-                  >
-                    {orderedFrames.length > 0 && (
-                      <CanvasEffectPreview
-                        src={orderedFrames[currentIndex]}
-                        effect={effectName}
-                        filter={tempFilter}
-                        className="option-preview-img"
-                      />
-                    )}
-                    <div className="option-card-overlay" />
-                    <span className="option-name">{effectName}</span>
-                  </div>
-                ))
+                EFFECTS.map(effectName => {
+                  const isCarouselCanvasRequired = ['Fish Eye', 'Chroma', 'Smear'].includes(effectName);
+                  return (
+                    <div
+                      key={effectName}
+                      className={`option-card ${tempEffect === effectName ? 'selected' : ''}`}
+                      onClick={() => setTempEffect(effectName)}
+                    >
+                      {orderedFrames.length > 0 && (
+                        <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                          {!isCarouselCanvasRequired ? (
+                            <img
+                              src={orderedFrames[currentIndex]}
+                              alt={effectName}
+                              className="option-preview-img"
+                              style={{
+                                filter: FILTERS[tempFilter] || 'none',
+                                animation: effectName === 'Slow Zoom'
+                                  ? 'slow-zoom-anim 2s ease-out infinite'
+                                  : effectName === 'Fast Zoom'
+                                    ? 'fast-zoom-anim 0.3s ease-out infinite'
+                                    : 'none'
+                              }}
+                            />
+                          ) : (
+                            <CanvasEffectPreview
+                              src={orderedFrames[currentIndex]}
+                              effect={effectName}
+                              filter={tempFilter}
+                              className="option-preview-img"
+                            />
+                          )}
+
+                          {effectName === 'Film Frame' && (
+                            <FilmFrameOverlay frameIndex={currentIndex} />
+                          )}
+
+                          {effectName === 'Film Grain' && (
+                            <FilmGrainOverlay />
+                          )}
+                        </div>
+                      )}
+                      <div className="option-card-overlay" />
+                      <span className="option-name">{effectName}</span>
+                    </div>
+                  );
+                })
               )}
             </div>
 
