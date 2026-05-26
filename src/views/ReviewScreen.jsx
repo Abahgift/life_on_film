@@ -341,6 +341,8 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [showMusicSheet, setShowMusicSheet] = useState(false);
   const audioInputRef = useRef(null);
   const audioRef = useRef(null);
+  // New persistent Audio instance
+  const audioInstanceRef = useRef(null);
   // Store object URL for cleanup
   const audioObjectURLRef = useRef(null);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -395,19 +397,17 @@ const handleAudioSelect = e => {
     setSelectedAudio(file);
     const url = URL.createObjectURL(file);
     setAudioURL(url);
-    // Set audio element source and keep reference for cleanup
-    if (audioRef.current) {
-      audioRef.current.src = url;
-    }
+    // Create persistent Audio instance
+    audioInstanceRef.current = new Audio(url);
+    // Store object URL for later revocation
     audioObjectURLRef.current = url;
     // Reset trim times
     setAudioStartTime(0);
     setAudioEndTime(0);
-    // Load duration
-    const tempAudio = new Audio(url);
-    tempAudio.addEventListener('loadedmetadata', () => {
-      setAudioDuration(tempAudio.duration);
-      setAudioEndTime(tempAudio.duration);
+    // Load duration using the new instance
+    audioInstanceRef.current.addEventListener('loadedmetadata', () => {
+      setAudioDuration(audioInstanceRef.current.duration);
+      setAudioEndTime(audioInstanceRef.current.duration);
     });
   } catch (err) {
     console.error(err);
@@ -436,26 +436,25 @@ const handleTrimEndChange = e => {
 
 // Playback control for audio preview
 useEffect(() => {
-  const audioEl = audioRef.current;
-  if (!audioEl) return;
+  if (!audioInstanceRef.current) return;
   if (isAudioPlaying) {
-    // Start from trim start
-    audioEl.currentTime = audioStartTime;
-    audioEl.play();
+    // Seek to trim start and play
+    audioInstanceRef.current.currentTime = audioStartTime;
+    audioInstanceRef.current.play();
     const handleTimeUpdate = () => {
-      if (audioEl.currentTime >= audioEndTime) {
-        audioEl.pause();
-        audioEl.currentTime = audioStartTime;
+      if (audioInstanceRef.current.currentTime >= audioEndTime) {
+        audioInstanceRef.current.pause();
+        audioInstanceRef.current.currentTime = audioStartTime;
         setIsAudioPlaying(false);
       }
     };
-    audioEl.addEventListener('timeupdate', handleTimeUpdate);
+    audioInstanceRef.current.addEventListener('timeupdate', handleTimeUpdate);
     return () => {
-      audioEl.removeEventListener('timeupdate', handleTimeUpdate);
-      audioEl.pause();
+      audioInstanceRef.current && audioInstanceRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      audioInstanceRef.current && audioInstanceRef.current.pause();
     };
   } else {
-    audioEl.pause();
+    audioInstanceRef.current && audioInstanceRef.current.pause();
   }
 }, [isAudioPlaying, audioStartTime, audioEndTime]);
 
@@ -467,12 +466,14 @@ const toggleAudioPlay = () => {
 const removeAudio = () => {
   setSelectedAudio(null);
   setAudioURL('');
+  // Revoke object URL and clear instance
   if (audioObjectURLRef.current) {
     URL.revokeObjectURL(audioObjectURLRef.current);
     audioObjectURLRef.current = null;
   }
-  if (audioRef.current) {
-    audioRef.current.src = '';
+  if (audioInstanceRef.current) {
+    audioInstanceRef.current.pause();
+    audioInstanceRef.current = null;
   }
   setAudioDuration(0);
   setAudioStartTime(0);
@@ -675,9 +676,11 @@ const exportVideo = () => {
 // Cleanup on component unmount: pause audio and revoke object URL
 useEffect(() => {
   return () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
+    // Cleanup persistent Audio instance
+    if (audioInstanceRef.current) {
+      audioInstanceRef.current.pause();
     }
+    // Revoke object URL if any
     if (audioObjectURLRef.current) {
       URL.revokeObjectURL(audioObjectURLRef.current);
     }
