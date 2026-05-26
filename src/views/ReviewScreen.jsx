@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+
 import './ReviewScreen.css';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 const FILTERS = {
   None: 'none',
@@ -313,12 +316,8 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
   );
 }
 
-// Props: frames (array of object URLs), onBack (function to return to Camera)
-export default function ReviewScreen({ frames = [], onBack }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [orderedFrames, setOrderedFrames] = useState(frames);
-  const [speed, setSpeed] = useState(1); // seconds per frame
+  const ReviewScreen = ({ frames = [], onBack }) => {
+
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('None');
   const [selectedEffect, setSelectedEffect] = useState('None');
@@ -347,6 +346,15 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const audioObjectURLRef = useRef(null);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioError, setAudioError] = useState('');
+const [orderedFrames, setOrderedFrames] = useState(frames);
+const [currentIndex, setCurrentIndex] = useState(0);
+const [isPlaying, setIsPlaying] = useState(false);
+const [speed, setSpeed] = useState(1);
+const [isExporting, setIsExporting] = useState(false);
+const [exportProgress, setExportProgress] = useState(0);
+const [showToast, setShowToast] = useState(false);
+const [toastMessage, setToastMessage] = useState('');
+
 
 
 
@@ -663,10 +671,223 @@ useEffect(() => {
 
   // UI action placeholders
   const placeholderAction = label => () => alert(`${label} – Coming soon`);
-  // Export function placeholder – frames will be mixed with audio later
-const exportVideo = () => {
-  console.log('Export flow placeholder – frames:', orderedFrames);
-  // TODO: mix selectedAudio from audioStartTime to audioEndTime using ffmpeg -i audio.mp3 -ss audioStartTime -t duration
+const exportVideo = async () => {
+  if (orderedFrames.length === 0) return;
+  // Reset export state
+  setIsExporting(true);
+  setExportProgress(0);
+  try {
+    // Step 1: Process frames to JPEG blobs
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const ctx = canvas.getContext('2d');
+    const frameFiles = [];
+    const totalFrames = orderedFrames.length;
+    let processedCount = 0;
+    const applyEffect = (effect) => {
+      // Reuse same logic as CanvasEffectPreview for effects
+      if (effect === 'Fish Eye') {
+        // Fish Eye effect
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const srcPix = imgData.data;
+        const outData = ctx.createImageData(canvas.width, canvas.height);
+        const outPix = outData.data;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const maxRadius = Math.min(centerX, centerY);
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            let sx = x, sy = y;
+            if (r < maxRadius) {
+              const normR = r / maxRadius;
+              const distortR = Math.sin(normR * Math.PI / 2) * maxRadius;
+              const theta = Math.atan2(dy, dx);
+              sx = Math.round(centerX + distortR * Math.cos(theta));
+              sy = Math.round(centerY + distortR * Math.sin(theta));
+            }
+            const destIdx = (y * canvas.width + x) * 4;
+            const srcIdx = (sy * canvas.width + sx) * 4;
+            outPix[destIdx] = srcPix[srcIdx];
+            outPix[destIdx + 1] = srcPix[srcIdx + 1];
+            outPix[destIdx + 2] = srcPix[srcIdx + 2];
+            outPix[destIdx + 3] = srcPix[srcIdx + 3];
+          }
+        }
+        ctx.putImageData(outData, 0, 0);
+      } else if (effect === 'Chroma') {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const srcPix = imgData.data;
+        const outData = ctx.createImageData(canvas.width, canvas.height);
+        const outPix = outData.data;
+        const offset = Math.round(canvas.width * 0.02);
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const idx = (y * canvas.width + x) * 4;
+            const rx = Math.max(0, x - offset);
+            const rIdx = (y * canvas.width + rx) * 4;
+            const bx = Math.min(canvas.width - 1, x + offset);
+            const bIdx = (y * canvas.width + bx) * 4;
+            outPix[idx] = srcPix[rIdx];
+            outPix[idx + 1] = srcPix[idx + 1];
+            outPix[idx + 2] = srcPix[bIdx + 2];
+            outPix[idx + 3] = srcPix[idx + 3];
+          }
+        }
+        ctx.putImageData(outData, 0, 0);
+      } else if (effect === 'Smear') {
+        const steps = 6;
+        const maxOffset = Math.round(canvas.width * 0.05);
+        ctx.globalAlpha = 1.0 / steps;
+        for (let i = 0; i < steps; i++) {
+          const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
+          ctx.drawImage(canvas, offset, 0, canvas.width, canvas.height);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+      // other effects use simple drawImage
+    };
+    for (let i = 0; i < orderedFrames.length; i++) {
+      const src = orderedFrames[i];
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise(res => { img.onload = res; img.src = src; });
+      // Resize image to canvas while preserving aspect ratio
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let drawW = canvas.width;
+      let drawH = canvas.height;
+      if (aspect > 1) {
+        drawH = Math.round(canvas.width / aspect);
+      } else {
+        drawW = Math.round(canvas.height * aspect);
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.filter = FILTERS[selectedFilter] || 'none';
+      ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
+      // Apply effect if needed
+      if (['Fish Eye', 'Chroma', 'Smear', 'Slow Zoom', 'Fast Zoom'].includes(selectedEffect)) {
+        if (selectedEffect === 'Slow Zoom' || selectedEffect === 'Fast Zoom') {
+          const framesPerPhoto = 24;
+          for (let f = 0; f < framesPerPhoto; f++) {
+            // Simple zoom animation: scale from 0.8 to 1.0
+            const scale = selectedEffect === 'Slow Zoom' ? 0.8 + (0.2 * f) / (framesPerPhoto - 1) : 0.8 + (0.2 * f) / (framesPerPhoto - 1);
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(scale, scale);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+            ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
+            ctx.restore();
+            applyEffect(selectedEffect);
+            const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+            const blob = await fetch(dataURL).then(r => r.blob());
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
+            frameFiles.push(fname);
+            // Write to ffmpeg FS later
+            // Store blob temporarily in map
+            window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
+            window.__ffmpegTempFiles[fname] = bytes;
+          }
+        } else {
+          applyEffect(selectedEffect);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+          const blob = await fetch(dataURL).then(r => r.blob());
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
+          frameFiles.push(fname);
+          window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
+          window.__ffmpegTempFiles[fname] = bytes;
+        }
+      } else {
+        const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+        const blob = await fetch(dataURL).then(r => r.blob());
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
+        frameFiles.push(fname);
+        window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
+        window.__ffmpegTempFiles[fname] = bytes;
+      }
+      processedCount++;
+      setExportProgress(Math.min(40, Math.round((processedCount / totalFrames) * 40)));
+    }
+    // Step 2: Load ffmpeg and write frames
+    const ffmpeg = new FFmpeg({ log: true });
+    await ffmpeg.load();
+    for (const name of frameFiles) {
+      ffmpeg.FS('writeFile', name, window.__ffmpegTempFiles[name]);
+    }
+    setExportProgress(40);
+    // Step 3: Encode video
+    await ffmpeg.run('-framerate', '24', '-i', 'frame%03d.jpg', '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', 'output.mp4');
+    setExportProgress(90);
+    const data = ffmpeg.FS('readFile', 'output.mp4');
+    const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
+    // Step 4: Thumbnail
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = 400;
+    thumbCanvas.height = 711;
+    const tctx = thumbCanvas.getContext('2d');
+    const firstImg = new Image();
+    firstImg.crossOrigin = 'anonymous';
+    await new Promise(res => { firstImg.onload = res; firstImg.src = orderedFrames[0]; });
+    const aspectT = firstImg.naturalWidth / firstImg.naturalHeight;
+    let tw = thumbCanvas.width, th = thumbCanvas.height;
+    if (aspectT > thumbCanvas.width / thumbCanvas.height) {
+      th = Math.round(tw / aspectT);
+    } else {
+      tw = Math.round(th * aspectT);
+    }
+    tctx.drawImage(firstImg, (thumbCanvas.width - tw) / 2, (thumbCanvas.height - th) / 2, tw, th);
+    const thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, 'image/jpeg', 0.92));
+    // Step 5: Save to IndexedDB
+    const dbReq = indexedDB.open('LifeOnFillmDB', 1);
+    dbReq.onupgradeneeded = function(event) {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('projects')) {
+        db.createObjectStore('projects', { keyPath: 'id' });
+      }
+    };
+    dbReq.onsuccess = function(event) {
+      const db = event.target.result;
+      const tx = db.transaction('projects', 'readwrite');
+      const store = tx.objectStore('projects');
+      const now = Date.now();
+      const record = {
+        id: now,
+        name: 'Film ' + new Date(now).toLocaleDateString(),
+        videoBlob,
+        thumbnailBlob: thumbBlob,
+        createdAt: now,
+        frameCount: frameFiles.length,
+        duration: orderedFrames.length * speed,
+        filter: selectedFilter,
+        effect: selectedEffect
+      };
+      store.put(record);
+      tx.oncomplete = () => {
+        setExportProgress(100);
+        setTimeout(() => {
+          setIsExporting(false);
+          setToastMessage('Film saved to your projects');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+        }, 1000);
+      };
+    };
+    dbReq.onerror = (e) => {
+      console.error('IndexedDB error', e);
+      throw new Error('IndexedDB error');
+    };
+  } catch (err) {
+    console.error('Export failed', err);
+    setIsExporting(false);
+    setToastMessage('Export failed. Please try again.');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  }
 };
 
   const activeFilter = showEffectsFiltersSheet ? tempFilter : selectedFilter;
@@ -877,7 +1098,6 @@ useEffect(() => {
             <span>Effects</span>
           </button>
           <button className="action-btn" onClick={() => {
-            setTempFilter(selectedFilter);
             setTempEffect(selectedEffect);
             setEffectsFiltersTab('Filter');
             setShowEffectsFiltersSheet(true);
@@ -895,6 +1115,63 @@ useEffect(() => {
 
         {/* Export Button */}
         <button className="export-pill-btn" onClick={exportVideo}>Export</button>
+        {/* Export Modal */}
+        {isExporting && (
+          <div className="export-modal-overlay" style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+          }}>
+            <div className="export-modal-card" style={{
+              backgroundColor: '#222',
+              padding: '40px 60px',
+              borderRadius: '12px',
+              textAlign: 'center',
+            }}>
+              <div className="progress-percentage" style={{
+                fontSize: '48px',
+                fontWeight: 'bold',
+                color: '#fff',
+              }}>{exportProgress}%</div>
+              <div className="subtitle" style={{ color: '#aaa', marginTop: '8px' }}>Exporting your film...</div>
+              <div className="progress-bar" style={{
+                marginTop: '16px',
+                width: '100%',
+                height: '8px',
+                backgroundColor: '#444',
+                borderRadius: '4px',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  width: `${exportProgress}%`,
+                  height: '100%',
+                  backgroundColor: '#0f0',
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Toast */}
+        {showToast && (
+          <div className="export-toast" style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#333',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            zIndex: 2000,
+          }}>{toastMessage}</div>
+        )}
       </div>
 
       {/* Music Bottom Sheet */}
@@ -1088,4 +1365,6 @@ useEffect(() => {
       )}
     </div>
   );
-}
+};
+
+export default ReviewScreen;
