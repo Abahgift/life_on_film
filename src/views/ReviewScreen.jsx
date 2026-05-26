@@ -341,8 +341,10 @@ export default function ReviewScreen({ frames = [], onBack }) {
   const [showMusicSheet, setShowMusicSheet] = useState(false);
   const audioInputRef = useRef(null);
   const audioRef = useRef(null);
-        const [audioDuration, setAudioDuration] = useState(0);
-const [audioError, setAudioError] = useState('');
+  // Store object URL for cleanup
+  const audioObjectURLRef = useRef(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioError, setAudioError] = useState('');
 
 
 
@@ -393,6 +395,11 @@ const handleAudioSelect = e => {
     setSelectedAudio(file);
     const url = URL.createObjectURL(file);
     setAudioURL(url);
+    // Set audio element source and keep reference for cleanup
+    if (audioRef.current) {
+      audioRef.current.src = url;
+    }
+    audioObjectURLRef.current = url;
     // Reset trim times
     setAudioStartTime(0);
     setAudioEndTime(0);
@@ -429,12 +436,28 @@ const handleTrimEndChange = e => {
 
 // Playback control for audio preview
 useEffect(() => {
-  if (isAudioPlaying && audioRef.current) {
-    audioRef.current.play();
-  } else if (audioRef.current) {
-    audioRef.current.pause();
+  const audioEl = audioRef.current;
+  if (!audioEl) return;
+  if (isAudioPlaying) {
+    // Start from trim start
+    audioEl.currentTime = audioStartTime;
+    audioEl.play();
+    const handleTimeUpdate = () => {
+      if (audioEl.currentTime >= audioEndTime) {
+        audioEl.pause();
+        audioEl.currentTime = audioStartTime;
+        setIsAudioPlaying(false);
+      }
+    };
+    audioEl.addEventListener('timeupdate', handleTimeUpdate);
+    return () => {
+      audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+      audioEl.pause();
+    };
+  } else {
+    audioEl.pause();
   }
-}, [isAudioPlaying, audioURL]);
+}, [isAudioPlaying, audioStartTime, audioEndTime]);
 
 const toggleAudioPlay = () => {
   setIsAudioPlaying(p => !p);
@@ -444,6 +467,13 @@ const toggleAudioPlay = () => {
 const removeAudio = () => {
   setSelectedAudio(null);
   setAudioURL('');
+  if (audioObjectURLRef.current) {
+    URL.revokeObjectURL(audioObjectURLRef.current);
+    audioObjectURLRef.current = null;
+  }
+  if (audioRef.current) {
+    audioRef.current.src = '';
+  }
   setAudioDuration(0);
   setAudioStartTime(0);
   setAudioEndTime(0);
@@ -468,7 +498,11 @@ useEffect(() => {
   const [scrubberProgress, setScrubberProgress] = useState(0);
 
   const togglePlay = () => {
-    setIsPlaying(p => !p);
+    setIsPlaying(prev => {
+      const newVal = !prev;
+      setIsAudioPlaying(newVal);
+      return newVal;
+    });
   };
 
   // Effect to handle playback start/stop with variable speed per frame
@@ -494,6 +528,12 @@ useEffect(() => {
           setIsPlaying(false);
           setCurrentIndex(0);
           setScrubberProgress(0);
+          // Ensure audio stops and resets
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = audioStartTime;
+            setIsAudioPlaying(false);
+          }
         }
       };
       animationRef.current = requestAnimationFrame(animate);
@@ -502,7 +542,7 @@ useEffect(() => {
     }
     // Cleanup on unmount or when dependencies change
     return () => cancelAnimationFrame(animationRef.current);
-  }, [isPlaying, orderedFrames.length, speed]);
+  }, [isPlaying, orderedFrames.length, speed, audioStartTime]);
 
   const handleScrubberChange = e => {
     const newVal = Number(e.target.value); // seconds (0 - totalDurationSec)
@@ -631,6 +671,18 @@ const exportVideo = () => {
   const activeFilter = showEffectsFiltersSheet ? tempFilter : selectedFilter;
   const activeEffect = showEffectsFiltersSheet ? tempEffect : selectedEffect;
   const isCanvasRequired = ['Fish Eye', 'Chroma', 'Smear'].includes(activeEffect);
+
+// Cleanup on component unmount: pause audio and revoke object URL
+useEffect(() => {
+  return () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (audioObjectURLRef.current) {
+      URL.revokeObjectURL(audioObjectURLRef.current);
+    }
+  };
+}, []);
 
   return (
     <div className="review-screen">
