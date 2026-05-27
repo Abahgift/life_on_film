@@ -316,7 +316,7 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
   );
 }
 
-  const ReviewScreen = ({ frames = [], onBack }) => {
+const ReviewScreen = ({ frames = [], onBack }) => {
 
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('None');
@@ -346,14 +346,14 @@ function CanvasEffectPreview({ src, effect, filter = 'None', maxDim = 320, class
   const audioObjectURLRef = useRef(null);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioError, setAudioError] = useState('');
-const [orderedFrames, setOrderedFrames] = useState(frames);
-const [currentIndex, setCurrentIndex] = useState(0);
-const [isPlaying, setIsPlaying] = useState(false);
-const [speed, setSpeed] = useState(1);
-const [isExporting, setIsExporting] = useState(false);
-const [exportProgress, setExportProgress] = useState(0);
-const [showToast, setShowToast] = useState(false);
-const [toastMessage, setToastMessage] = useState('');
+  const [orderedFrames, setOrderedFrames] = useState(frames);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
 
 
@@ -375,127 +375,127 @@ const [toastMessage, setToastMessage] = useState('');
   }, [selectedEffect, showEffectsFiltersSheet, tempEffect]);
 
   const handleFileChange = e => {
-  const files = Array.from(e.target.files);
-  setOrderedFrames(prev => {
-    const space = 10 - prev.length;
-    if (space <= 0) return prev;
-    const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
-    return [...prev, ...newUrls];
-  });
-  // Reset input value so same file can be selected again
-  e.target.value = '';
-};
+    const files = Array.from(e.target.files);
+    setOrderedFrames(prev => {
+      const space = 10 - prev.length;
+      if (space <= 0) return prev;
+      const newUrls = files.slice(0, space).map(f => URL.createObjectURL(f));
+      return [...prev, ...newUrls];
+    });
+    // Reset input value so same file can be selected again
+    e.target.value = '';
+  };
 
-// Audio file selection handler
-const handleAudioSelect = e => {
-  try {
-    const file = e.target.files[0];
-    if (!file) return;
-    // Validate file type for audio
-    const allowedExt = ['mp3', 'm4a', 'aac', 'wav', 'ogg'];
-    const mimeValid = file.type && file.type.startsWith('audio/');
-    const ext = file.name.split('.').pop().toLowerCase();
-    const extValid = allowedExt.includes(ext);
-    if (!mimeValid && !extValid) {
-      setAudioError('Please select an audio file (MP3, M4A, AAC, WAV)');
+  // Audio file selection handler
+  const handleAudioSelect = e => {
+    try {
+      const file = e.target.files[0];
+      if (!file) return;
+      // Validate file type for audio
+      const allowedExt = ['mp3', 'm4a', 'aac', 'wav', 'ogg'];
+      const mimeValid = file.type && file.type.startsWith('audio/');
+      const ext = file.name.split('.').pop().toLowerCase();
+      const extValid = allowedExt.includes(ext);
+      if (!mimeValid && !extValid) {
+        setAudioError('Please select an audio file (MP3, M4A, AAC, WAV)');
+        e.target.value = '';
+        return;
+      }
+      setAudioError('');
+      setSelectedAudio(file);
+      const url = URL.createObjectURL(file);
+      setAudioURL(url);
+      // Create persistent Audio instance
+      audioInstanceRef.current = new Audio(url);
+      // Store object URL for later revocation
+      audioObjectURLRef.current = url;
+      // Reset trim times
+      setAudioStartTime(0);
+      setAudioEndTime(0);
+      // Load duration using the new instance
+      audioInstanceRef.current.addEventListener('loadedmetadata', () => {
+        setAudioDuration(audioInstanceRef.current.duration);
+        setAudioEndTime(audioInstanceRef.current.duration);
+      });
+    } catch (err) {
+      console.error(err);
+      setAudioError('Error loading audio file');
       e.target.value = '';
-      return;
     }
-    setAudioError('');
-    setSelectedAudio(file);
-    const url = URL.createObjectURL(file);
-    setAudioURL(url);
-    // Create persistent Audio instance
-    audioInstanceRef.current = new Audio(url);
-    // Store object URL for later revocation
-    audioObjectURLRef.current = url;
-    // Reset trim times
+  };
+
+  // Helper to format seconds to m:ss
+  const formatTime = secs => {
+    const minutes = Math.floor(secs / 60);
+    const seconds = Math.round(secs % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Trim range handlers
+  const handleTrimStartChange = e => {
+    const val = parseFloat(e.target.value);
+    if (val <= audioEndTime) setAudioStartTime(val);
+  };
+
+  const handleTrimEndChange = e => {
+    const val = parseFloat(e.target.value);
+    if (val >= audioStartTime) setAudioEndTime(val);
+  };
+
+  // Playback control for audio preview
+  useEffect(() => {
+    if (!audioInstanceRef.current) return;
+    if (isAudioPlaying) {
+      // Seek to trim start and play
+      audioInstanceRef.current.currentTime = audioStartTime;
+      audioInstanceRef.current.play();
+      const handleTimeUpdate = () => {
+        if (audioInstanceRef.current.currentTime >= audioEndTime) {
+          audioInstanceRef.current.pause();
+          audioInstanceRef.current.currentTime = audioStartTime;
+          setIsAudioPlaying(false);
+        }
+      };
+      audioInstanceRef.current.addEventListener('timeupdate', handleTimeUpdate);
+      return () => {
+        audioInstanceRef.current && audioInstanceRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioInstanceRef.current && audioInstanceRef.current.pause();
+      };
+    } else {
+      audioInstanceRef.current && audioInstanceRef.current.pause();
+    }
+  }, [isAudioPlaying, audioStartTime, audioEndTime]);
+
+  const toggleAudioPlay = () => {
+    setIsAudioPlaying(p => !p);
+  };
+
+  // Remove selected audio
+  const removeAudio = () => {
+    setSelectedAudio(null);
+    setAudioURL('');
+    // Revoke object URL and clear instance
+    if (audioObjectURLRef.current) {
+      URL.revokeObjectURL(audioObjectURLRef.current);
+      audioObjectURLRef.current = null;
+    }
+    if (audioInstanceRef.current) {
+      audioInstanceRef.current.pause();
+      audioInstanceRef.current = null;
+    }
+    setAudioDuration(0);
     setAudioStartTime(0);
     setAudioEndTime(0);
-    // Load duration using the new instance
-    audioInstanceRef.current.addEventListener('loadedmetadata', () => {
-      setAudioDuration(audioInstanceRef.current.duration);
-      setAudioEndTime(audioInstanceRef.current.duration);
-    });
-  } catch (err) {
-    console.error(err);
-    setAudioError('Error loading audio file');
-    e.target.value = '';
-  }
-};
-
-// Helper to format seconds to m:ss
-const formatTime = secs => {
-  const minutes = Math.floor(secs / 60);
-  const seconds = Math.round(secs % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-
-// Trim range handlers
-const handleTrimStartChange = e => {
-  const val = parseFloat(e.target.value);
-  if (val <= audioEndTime) setAudioStartTime(val);
-};
-
-const handleTrimEndChange = e => {
-  const val = parseFloat(e.target.value);
-  if (val >= audioStartTime) setAudioEndTime(val);
-};
-
-// Playback control for audio preview
-useEffect(() => {
-  if (!audioInstanceRef.current) return;
-  if (isAudioPlaying) {
-    // Seek to trim start and play
-    audioInstanceRef.current.currentTime = audioStartTime;
-    audioInstanceRef.current.play();
-    const handleTimeUpdate = () => {
-      if (audioInstanceRef.current.currentTime >= audioEndTime) {
-        audioInstanceRef.current.pause();
-        audioInstanceRef.current.currentTime = audioStartTime;
-        setIsAudioPlaying(false);
-      }
-    };
-    audioInstanceRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    return () => {
-      audioInstanceRef.current && audioInstanceRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-      audioInstanceRef.current && audioInstanceRef.current.pause();
-    };
-  } else {
-    audioInstanceRef.current && audioInstanceRef.current.pause();
-  }
-}, [isAudioPlaying, audioStartTime, audioEndTime]);
-
-const toggleAudioPlay = () => {
-  setIsAudioPlaying(p => !p);
-};
-
-// Remove selected audio
-const removeAudio = () => {
-  setSelectedAudio(null);
-  setAudioURL('');
-  // Revoke object URL and clear instance
-  if (audioObjectURLRef.current) {
-    URL.revokeObjectURL(audioObjectURLRef.current);
-    audioObjectURLRef.current = null;
-  }
-  if (audioInstanceRef.current) {
-    audioInstanceRef.current.pause();
-    audioInstanceRef.current = null;
-  }
-  setAudioDuration(0);
-  setAudioStartTime(0);
-  setAudioEndTime(0);
-  setIsAudioPlaying(false);
-};
-
-// Ensure playback stops when sheet is closed
-useEffect(() => {
-  if (!showMusicSheet && audioRef.current) {
-    audioRef.current.pause();
     setIsAudioPlaying(false);
-  }
-}, [showMusicSheet]);
+  };
+
+  // Ensure playback stops when sheet is closed
+  useEffect(() => {
+    if (!showMusicSheet && audioRef.current) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
+    }
+  }, [showMusicSheet]);
 
   // Ensure speed state resets when frames length changes (optional)
   useEffect(() => {
@@ -669,244 +669,345 @@ useEffect(() => {
     });
   };
 
-  // UI action placeholders
-  const placeholderAction = label => () => alert(`${label} – Coming soon`);
-const exportVideo = async () => {
-  if (orderedFrames.length === 0) return;
-  // Reset export state
-  setIsExporting(true);
-  setExportProgress(0);
-  try {
-    // Step 1: Process frames to JPEG blobs
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = 1920;
-    const ctx = canvas.getContext('2d');
-    const frameFiles = [];
-    const totalFrames = orderedFrames.length;
-    let processedCount = 0;
-    const applyEffect = (effect) => {
-      // Reuse same logic as CanvasEffectPreview for effects
-      if (effect === 'Fish Eye') {
-        // Fish Eye effect
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const srcPix = imgData.data;
-        const outData = ctx.createImageData(canvas.width, canvas.height);
-        const outPix = outData.data;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const maxRadius = Math.min(centerX, centerY);
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const dx = x - centerX;
-            const dy = y - centerY;
-            const r = Math.sqrt(dx * dx + dy * dy);
-            let sx = x, sy = y;
-            if (r < maxRadius) {
-              const normR = r / maxRadius;
-              const distortR = Math.sin(normR * Math.PI / 2) * maxRadius;
-              const theta = Math.atan2(dy, dx);
-              sx = Math.round(centerX + distortR * Math.cos(theta));
-              sy = Math.round(centerY + distortR * Math.sin(theta));
+  // ─── EXPORT VIDEO ──────────────────────────────────────────────────────────
+  // FIX: Uses the modern @ffmpeg/ffmpeg v0.12+ API:
+  //   • ffmpeg.load({ coreURL, wasmURL })  instead of ffmpeg.load()
+  //   • await ffmpeg.writeFile(name, bytes) instead of ffmpeg.FS('writeFile', ...)
+  //   • await ffmpeg.exec([...args])        instead of await ffmpeg.run(...)
+  //   • await ffmpeg.readFile('output.mp4') instead of ffmpeg.FS('readFile', ...)
+  // FIX: Audio is now written to FFmpeg FS and muxed into the final video,
+  //      respecting the user's trim start/end times.
+  const exportVideo = async () => {
+    if (orderedFrames.length === 0) return;
+    setIsExporting(true);
+    setExportProgress(0);
+
+    // Temp storage for frame bytes
+    window.__ffmpegTempFiles = {};
+
+    try {
+      // ── STEP 1: Render every frame to JPEG bytes (0 → 40%) ──────────────
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext('2d');
+      const frameFiles = [];
+      const totalFrames = orderedFrames.length;
+
+      // Helper: apply pixel-level effects after the image has been drawn
+      const applyPixelEffect = (effect) => {
+        if (effect === 'Fish Eye') {
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const srcPix = imgData.data;
+          const outData = ctx.createImageData(canvas.width, canvas.height);
+          const outPix = outData.data;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const maxRadius = Math.min(centerX, centerY);
+          for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+              const dx = x - centerX;
+              const dy = y - centerY;
+              const r = Math.sqrt(dx * dx + dy * dy);
+              let sx = x, sy = y;
+              if (r < maxRadius) {
+                const normR = r / maxRadius;
+                const distortR = Math.sin(normR * Math.PI / 2) * maxRadius;
+                const theta = Math.atan2(dy, dx);
+                sx = Math.round(centerX + distortR * Math.cos(theta));
+                sy = Math.round(centerY + distortR * Math.sin(theta));
+              }
+              const destIdx = (y * canvas.width + x) * 4;
+              const srcIdx = (sy * canvas.width + sx) * 4;
+              outPix[destIdx] = srcPix[srcIdx];
+              outPix[destIdx + 1] = srcPix[srcIdx + 1];
+              outPix[destIdx + 2] = srcPix[srcIdx + 2];
+              outPix[destIdx + 3] = srcPix[srcIdx + 3];
             }
-            const destIdx = (y * canvas.width + x) * 4;
-            const srcIdx = (sy * canvas.width + sx) * 4;
-            outPix[destIdx] = srcPix[srcIdx];
-            outPix[destIdx + 1] = srcPix[srcIdx + 1];
-            outPix[destIdx + 2] = srcPix[srcIdx + 2];
-            outPix[destIdx + 3] = srcPix[srcIdx + 3];
           }
-        }
-        ctx.putImageData(outData, 0, 0);
-      } else if (effect === 'Chroma') {
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const srcPix = imgData.data;
-        const outData = ctx.createImageData(canvas.width, canvas.height);
-        const outPix = outData.data;
-        const offset = Math.round(canvas.width * 0.02);
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const idx = (y * canvas.width + x) * 4;
-            const rx = Math.max(0, x - offset);
-            const rIdx = (y * canvas.width + rx) * 4;
-            const bx = Math.min(canvas.width - 1, x + offset);
-            const bIdx = (y * canvas.width + bx) * 4;
-            outPix[idx] = srcPix[rIdx];
-            outPix[idx + 1] = srcPix[idx + 1];
-            outPix[idx + 2] = srcPix[bIdx + 2];
-            outPix[idx + 3] = srcPix[idx + 3];
+          ctx.putImageData(outData, 0, 0);
+
+        } else if (effect === 'Chroma') {
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const srcPix = imgData.data;
+          const outData = ctx.createImageData(canvas.width, canvas.height);
+          const outPix = outData.data;
+          const offset = Math.round(canvas.width * 0.02);
+          for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+              const idx = (y * canvas.width + x) * 4;
+              const rx = Math.max(0, x - offset);
+              const rIdx = (y * canvas.width + rx) * 4;
+              const bx = Math.min(canvas.width - 1, x + offset);
+              const bIdx = (y * canvas.width + bx) * 4;
+              outPix[idx] = srcPix[rIdx];
+              outPix[idx + 1] = srcPix[idx + 1];
+              outPix[idx + 2] = srcPix[bIdx + 2];
+              outPix[idx + 3] = srcPix[idx + 3];
+            }
           }
+          ctx.putImageData(outData, 0, 0);
+
+        } else if (effect === 'Smear') {
+          // Smear needs the original image; we re-draw it with offsets
+          // (ctx already has the base image at this point)
+          const steps = 6;
+          const maxOffset = Math.round(canvas.width * 0.05);
+          // Read the current canvas as source
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const tctx = tempCanvas.getContext('2d');
+          tctx.drawImage(canvas, 0, 0);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.globalAlpha = 1.0 / steps;
+          for (let i = 0; i < steps; i++) {
+            const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
+            ctx.drawImage(tempCanvas, offset, 0, canvas.width, canvas.height);
+          }
+          ctx.globalAlpha = 1.0;
         }
-        ctx.putImageData(outData, 0, 0);
-      } else if (effect === 'Smear') {
-        const steps = 6;
-        const maxOffset = Math.round(canvas.width * 0.05);
-        ctx.globalAlpha = 1.0 / steps;
-        for (let i = 0; i < steps; i++) {
-          const offset = (i - (steps - 1) / 2) * (maxOffset / steps);
-          ctx.drawImage(canvas, offset, 0, canvas.width, canvas.height);
+      };
+
+      // Helper: push current canvas contents as a numbered JPEG frame
+      const pushFrame = async () => {
+        const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+        const blob = await fetch(dataURL).then(r => r.blob());
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const fname = `frame${String(frameFiles.length + 1).padStart(4, '0')}.jpg`;
+        frameFiles.push(fname);
+        window.__ffmpegTempFiles[fname] = bytes;
+      };
+
+      for (let i = 0; i < orderedFrames.length; i++) {
+        const src = orderedFrames[i];
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise(res => { img.onload = res; img.src = src; });
+
+        // Scale image to fill canvas (cover-style)
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = canvas.width / canvas.height;
+        let drawW, drawH, drawX, drawY;
+        if (aspect > canvasAspect) {
+          drawH = canvas.height;
+          drawW = Math.round(canvas.height * aspect);
+        } else {
+          drawW = canvas.width;
+          drawH = Math.round(canvas.width / aspect);
         }
-        ctx.globalAlpha = 1.0;
-      }
-      // other effects use simple drawImage
-    };
-    for (let i = 0; i < orderedFrames.length; i++) {
-      const src = orderedFrames[i];
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise(res => { img.onload = res; img.src = src; });
-      // Resize image to canvas while preserving aspect ratio
-      const aspect = img.naturalWidth / img.naturalHeight;
-      let drawW = canvas.width;
-      let drawH = canvas.height;
-      if (aspect > 1) {
-        drawH = Math.round(canvas.width / aspect);
-      } else {
-        drawW = Math.round(canvas.height * aspect);
-      }
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.filter = FILTERS[selectedFilter] || 'none';
-      ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
-      // Apply effect if needed
-      if (['Fish Eye', 'Chroma', 'Smear', 'Slow Zoom', 'Fast Zoom'].includes(selectedEffect)) {
+        drawX = Math.round((canvas.width - drawW) / 2);
+        drawY = Math.round((canvas.height - drawH) / 2);
+
+        ctx.filter = FILTERS[selectedFilter] || 'none';
+
         if (selectedEffect === 'Slow Zoom' || selectedEffect === 'Fast Zoom') {
+          // Render one sub-frame per 24 fps tick (24 frames per photo slot)
           const framesPerPhoto = 24;
+          const zoomDuration = selectedEffect === 'Slow Zoom' ? speed : 0.3;
           for (let f = 0; f < framesPerPhoto; f++) {
-            // Simple zoom animation: scale from 0.8 to 1.0
-            const scale = selectedEffect === 'Slow Zoom' ? 0.8 + (0.2 * f) / (framesPerPhoto - 1) : 0.8 + (0.2 * f) / (framesPerPhoto - 1);
+            const t = f / (framesPerPhoto - 1); // 0 → 1
+            const scale = 0.85 + 0.15 * t;          // zoom from 0.85× to 1.0×
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.scale(scale, scale);
             ctx.translate(-canvas.width / 2, -canvas.height / 2);
-            ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
             ctx.restore();
-            applyEffect(selectedEffect);
-            const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-            const blob = await fetch(dataURL).then(r => r.blob());
-            const bytes = new Uint8Array(await blob.arrayBuffer());
-            const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
-            frameFiles.push(fname);
-            // Write to ffmpeg FS later
-            // Store blob temporarily in map
-            window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
-            window.__ffmpegTempFiles[fname] = bytes;
+            await pushFrame();
           }
         } else {
-          applyEffect(selectedEffect);
-          const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-          const blob = await fetch(dataURL).then(r => r.blob());
-          const bytes = new Uint8Array(await blob.arrayBuffer());
-          const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
-          frameFiles.push(fname);
-          window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
-          window.__ffmpegTempFiles[fname] = bytes;
+          // Single frame per photo
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          ctx.filter = 'none'; // reset before pixel ops
+
+          // Re-apply filter via ImageData tint is not feasible; filter was already baked in above.
+          // For pixel-level effects, re-grab with filter already applied:
+          if (['Fish Eye', 'Chroma', 'Smear'].includes(selectedEffect)) {
+            applyPixelEffect(selectedEffect);
+          }
+          // Film Frame / Film Grain are overlay-only; baked in separately below if needed.
+          await pushFrame();
         }
+
+        ctx.filter = 'none'; // always reset
+        setExportProgress(Math.round(((i + 1) / totalFrames) * 40));
+      }
+
+      // ── STEP 2: Initialise FFmpeg with CDN-loaded WASM (fix for v0.12+) ──
+      setExportProgress(42);
+      const ffmpeg = new FFmpeg();
+
+      // Progress callback so the bar keeps moving during encode
+      ffmpeg.on('progress', ({ progress }) => {
+        // progress is 0–1 covering the encode phase (40% → 90% in our bar)
+        setExportProgress(42 + Math.round(progress * 48));
+      });
+
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
+
+      // ── STEP 3: Write frame files into FFmpeg virtual FS ─────────────────
+      for (const name of frameFiles) {
+        await ffmpeg.writeFile(name, window.__ffmpegTempFiles[name]);
+      }
+
+      // ── STEP 4: Optionally write audio into FFmpeg virtual FS ─────────────
+      let hasAudio = false;
+      if (selectedAudio && audioURL) {
+        try {
+          const audioResp = await fetch(audioURL);
+          const audioBytes = new Uint8Array(await audioResp.arrayBuffer());
+          await ffmpeg.writeFile('input_audio', audioBytes);
+          hasAudio = true;
+        } catch (audioErr) {
+          console.warn('Could not load audio for muxing – exporting video-only.', audioErr);
+        }
+      }
+
+      // ── STEP 5: Build FFmpeg command and encode ────────────────────────────
+      // Framerate: for zoom effects we generated 24 sub-frames per photo, so
+      // the framerate stays at 24 fps. For regular effects each photo is one
+      // frame shown for `speed` seconds → framerate = 1/speed fps.
+      const isZoomEffect = selectedEffect === 'Slow Zoom' || selectedEffect === 'Fast Zoom';
+      const inputFps = isZoomEffect ? '24' : String(Math.round(1 / speed * 100) / 100);
+
+      const ffmpegArgs = [
+        '-framerate', inputFps,
+        '-i', 'frame%04d.jpg',
+      ];
+
+      if (hasAudio) {
+        // Trim audio to the user-selected range
+        ffmpegArgs.push(
+          '-ss', String(audioStartTime),
+          '-to', String(audioEndTime),
+          '-i', 'input_audio',
+        );
+      }
+
+      ffmpegArgs.push(
+        '-c:v', 'libx264',
+        '-preset', 'fast',       // 'fast' is a good balance; 'slow' times out on large sets
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+      );
+
+      if (hasAudio) {
+        ffmpegArgs.push(
+          '-map', '0:v',          // video from first input (frames)
+          '-map', '1:a',          // audio from second input
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-shortest',            // end when the shorter stream ends
+        );
+      }
+
+      ffmpegArgs.push('output.mp4');
+
+      await ffmpeg.exec(ffmpegArgs);
+      setExportProgress(90);
+
+      // ── STEP 6: Read output and build Blob ────────────────────────────────
+      const data = await ffmpeg.readFile('output.mp4');
+      const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
+
+      // ── STEP 7: Generate thumbnail from first frame ───────────────────────
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = 400;
+      thumbCanvas.height = 711;
+      const tctx = thumbCanvas.getContext('2d');
+      const firstImg = new Image();
+      firstImg.crossOrigin = 'anonymous';
+      await new Promise(res => { firstImg.onload = res; firstImg.src = orderedFrames[0]; });
+      const aspectT = firstImg.naturalWidth / firstImg.naturalHeight;
+      const canvasAspectT = thumbCanvas.width / thumbCanvas.height;
+      let tw, th, tx, ty;
+      if (aspectT > canvasAspectT) {
+        th = thumbCanvas.height;
+        tw = Math.round(th * aspectT);
       } else {
-        const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-        const blob = await fetch(dataURL).then(r => r.blob());
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        const fname = `frame${String(frameFiles.length + 1).padStart(3, '0')}.jpg`;
-        frameFiles.push(fname);
-        window.__ffmpegTempFiles = window.__ffmpegTempFiles || {};
-        window.__ffmpegTempFiles[fname] = bytes;
+        tw = thumbCanvas.width;
+        th = Math.round(tw / aspectT);
       }
-      processedCount++;
-      setExportProgress(Math.min(40, Math.round((processedCount / totalFrames) * 40)));
-    }
-    // Step 2: Load ffmpeg and write frames
-    const ffmpeg = new FFmpeg({ log: true });
-    await ffmpeg.load();
-    for (const name of frameFiles) {
-      ffmpeg.FS('writeFile', name, window.__ffmpegTempFiles[name]);
-    }
-    setExportProgress(40);
-    // Step 3: Encode video
-    await ffmpeg.run('-framerate', '24', '-i', 'frame%03d.jpg', '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', 'output.mp4');
-    setExportProgress(90);
-    const data = ffmpeg.FS('readFile', 'output.mp4');
-    const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
-    // Step 4: Thumbnail
-    const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = 400;
-    thumbCanvas.height = 711;
-    const tctx = thumbCanvas.getContext('2d');
-    const firstImg = new Image();
-    firstImg.crossOrigin = 'anonymous';
-    await new Promise(res => { firstImg.onload = res; firstImg.src = orderedFrames[0]; });
-    const aspectT = firstImg.naturalWidth / firstImg.naturalHeight;
-    let tw = thumbCanvas.width, th = thumbCanvas.height;
-    if (aspectT > thumbCanvas.width / thumbCanvas.height) {
-      th = Math.round(tw / aspectT);
-    } else {
-      tw = Math.round(th * aspectT);
-    }
-    tctx.drawImage(firstImg, (thumbCanvas.width - tw) / 2, (thumbCanvas.height - th) / 2, tw, th);
-    const thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, 'image/jpeg', 0.92));
-    // Step 5: Save to IndexedDB
-    const dbReq = indexedDB.open('LifeOnFillmDB', 1);
-    dbReq.onupgradeneeded = function(event) {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'id' });
-      }
-    };
-    dbReq.onsuccess = function(event) {
-      const db = event.target.result;
-      const tx = db.transaction('projects', 'readwrite');
-      const store = tx.objectStore('projects');
-      const now = Date.now();
-      const record = {
-        id: now,
-        name: 'Film ' + new Date(now).toLocaleDateString(),
-        videoBlob,
-        thumbnailBlob: thumbBlob,
-        createdAt: now,
-        frameCount: frameFiles.length,
-        duration: orderedFrames.length * speed,
-        filter: selectedFilter,
-        effect: selectedEffect
+      tx = Math.round((thumbCanvas.width - tw) / 2);
+      ty = Math.round((thumbCanvas.height - th) / 2);
+      tctx.drawImage(firstImg, tx, ty, tw, th);
+      const thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, 'image/jpeg', 0.92));
+
+      // ── STEP 8: Save to IndexedDB ─────────────────────────────────────────
+      const dbReq = indexedDB.open('LifeOnFilmDB', 1);
+      dbReq.onupgradeneeded = function (event) {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('projects')) {
+          db.createObjectStore('projects', { keyPath: 'id' });
+        }
       };
-      store.put(record);
-      tx.oncomplete = () => {
-        setExportProgress(100);
-        setTimeout(() => {
-          setIsExporting(false);
-          setToastMessage('Film saved to your projects');
-          setShowToast(true);
-          setTimeout(() => setShowToast(false), 3000);
-        }, 1000);
+      dbReq.onsuccess = function (event) {
+        const db = event.target.result;
+        const tx = db.transaction('projects', 'readwrite');
+        const store = tx.objectStore('projects');
+        const now = Date.now();
+        store.put({
+          id: now,
+          name: 'Film ' + new Date(now).toLocaleDateString(),
+          videoBlob,
+          thumbnailBlob: thumbBlob,
+          createdAt: now,
+          frameCount: frameFiles.length,
+          duration: orderedFrames.length * speed,
+          filter: selectedFilter,
+          effect: selectedEffect,
+        });
+        tx.oncomplete = () => {
+          setExportProgress(100);
+          setTimeout(() => {
+            setIsExporting(false);
+            setToastMessage('Film saved to your projects 🎞️');
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3500);
+          }, 600);
+        };
+        tx.onerror = (e) => { throw new Error('IndexedDB write failed: ' + e.target.error); };
       };
-    };
-    dbReq.onerror = (e) => {
-      console.error('IndexedDB error', e);
-      throw new Error('IndexedDB error');
-    };
-  } catch (err) {
-    console.error('Export failed', err);
-    setIsExporting(false);
-    setToastMessage('Export failed. Please try again.');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  }
-};
+      dbReq.onerror = (e) => { throw new Error('IndexedDB open failed: ' + e.target.error); };
+
+    } catch (err) {
+      console.error('Export failed:', err);
+      setIsExporting(false);
+      setToastMessage('Export failed – ' + (err.message || 'please try again'));
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+    } finally {
+      // Clean up temp frame data regardless of success/failure
+      window.__ffmpegTempFiles = {};
+    }
+  };
+  // ─── END EXPORT VIDEO ──────────────────────────────────────────────────────
 
   const activeFilter = showEffectsFiltersSheet ? tempFilter : selectedFilter;
   const activeEffect = showEffectsFiltersSheet ? tempEffect : selectedEffect;
   const isCanvasRequired = ['Fish Eye', 'Chroma', 'Smear'].includes(activeEffect);
 
-// Cleanup on component unmount: pause audio and revoke object URL
-useEffect(() => {
-  return () => {
-    // Cleanup persistent Audio instance
-    if (audioInstanceRef.current) {
-      audioInstanceRef.current.pause();
-    }
-    // Revoke object URL if any
-    if (audioObjectURLRef.current) {
-      URL.revokeObjectURL(audioObjectURLRef.current);
-    }
-  };
-}, []);
+  // Cleanup on component unmount: pause audio and revoke object URL
+  useEffect(() => {
+    return () => {
+      // Cleanup persistent Audio instance
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+      }
+      // Revoke object URL if any
+      if (audioObjectURLRef.current) {
+        URL.revokeObjectURL(audioObjectURLRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="review-screen">
@@ -1029,7 +1130,7 @@ useEffect(() => {
             />
           )
         )}
-        
+
         {/* Render Film Frame Overlay if activeEffect is 'Film Frame' */}
         {activeEffect === 'Film Frame' && (
           <FilmFrameOverlay frameIndex={currentIndex} />
@@ -1107,9 +1208,9 @@ useEffect(() => {
             ⏳<span>Speed</span>
           </button>
           <button className="action-btn" onClick={() => { setShowMusicSheet(true); }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M10.0909 11.9629L19.3636 8.63087V14.1707C18.8126 13.8538 18.1574 13.67 17.4545 13.67C15.4964 13.67 13.9091 15.096 13.9091 16.855C13.9091 18.614 15.4964 20.04 17.4545 20.04C19.4126 20.04 21 18.614 21 16.855C21 16.8551 21 16.855L21 7.49236C21 6.37238 21 5.4331 20.9123 4.68472C20.8999 4.57895 20.8852 4.4738 20.869 4.37569C20.7845 3.86441 20.6352 3.38745 20.347 2.98917C20.2028 2.79002 20.024 2.61055 19.8012 2.45628C19.7594 2.42736 19.716 2.39932 19.6711 2.3722L19.6621 2.36679C18.8906 1.90553 18.0233 1.93852 17.1298 2.14305C16.2657 2.34086 15.1944 2.74368 13.8808 3.23763L11.5963 4.09656C10.9806 4.32806 10.4589 4.52419 10.0494 4.72734C9.61376 4.94348 9.23849 5.1984 8.95707 5.57828C8.67564 5.95817 8.55876 6.36756 8.50501 6.81203C8.4545 7.22978 8.45452 7.7378 8.45455 8.33743V16.1307C7.90347 15.8138 7.24835 15.63 6.54545 15.63C4.58735 15.63 3 17.056 3 18.815C3 20.574 4.58735 22 6.54545 22C8.50355 22 10.0909 20.574 10.0909 18.815C10.0909 18.8151 10.0909 18.815L10.0909 11.9629Z" fill="white" /></svg>
-              <span>Music</span>
-              {selectedAudio && <span className="music-indicator"></span>}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M10.0909 11.9629L19.3636 8.63087V14.1707C18.8126 13.8538 18.1574 13.67 17.4545 13.67C15.4964 13.67 13.9091 15.096 13.9091 16.855C13.9091 18.614 15.4964 20.04 17.4545 20.04C19.4126 20.04 21 18.614 21 16.855C21 16.8551 21 16.855L21 7.49236C21 6.37238 21 5.4331 20.9123 4.68472C20.8999 4.57895 20.8852 4.4738 20.869 4.37569C20.7845 3.86441 20.6352 3.38745 20.347 2.98917C20.2028 2.79002 20.024 2.61055 19.8012 2.45628C19.7594 2.42736 19.716 2.39932 19.6711 2.3722L19.6621 2.36679C18.8906 1.90553 18.0233 1.93852 17.1298 2.14305C16.2657 2.34086 15.1944 2.74368 13.8808 3.23763L11.5963 4.09656C10.9806 4.32806 10.4589 4.52419 10.0494 4.72734C9.61376 4.94348 9.23849 5.1984 8.95707 5.57828C8.67564 5.95817 8.55876 6.36756 8.50501 6.81203C8.4545 7.22978 8.45452 7.7378 8.45455 8.33743V16.1307C7.90347 15.8138 7.24835 15.63 6.54545 15.63C4.58735 15.63 3 17.056 3 18.815C3 20.574 4.58735 22 6.54545 22C8.50355 22 10.0909 20.574 10.0909 18.815C10.0909 18.8151 10.0909 18.815L10.0909 11.9629Z" fill="white" /></svg>
+            <span>Music</span>
+            {selectedAudio && <span className="music-indicator"></span>}
           </button>
         </div>
 
@@ -1153,6 +1254,7 @@ useEffect(() => {
                   width: `${exportProgress}%`,
                   height: '100%',
                   backgroundColor: '#0f0',
+                  transition: 'width 0.3s ease',
                 }} />
               </div>
             </div>
@@ -1175,43 +1277,43 @@ useEffect(() => {
       </div>
 
       {/* Music Bottom Sheet */}
-{showMusicSheet && (
-  <div className="music-sheet-overlay" onClick={() => setShowMusicSheet(false)}>
-    <div className="music-sheet" onClick={e => e.stopPropagation()}>
-      <div className="sheet-handle" />
-      <div className="sheet-title">Add Music</div>
-      {!selectedAudio ? (
-        <div className="music-upload-area" onClick={() => audioInputRef.current && audioInputRef.current.click()}>
-          <div className="music-note-icon">🎵</div>
-          <div className="upload-text">Tap to select audio</div>
-        </div>
-      ) : (
-        <div className="music-selected">
-          <div className="audio-file-name">
-            <span>{selectedAudio.name.length > 20 ? selectedAudio.name.slice(0, 17) + '…' : selectedAudio.name}</span>
-            <button className="remove-audio-btn" onClick={removeAudio}>✕</button>
-          </div>
-          <div className="playback-preview">
-            <button onClick={toggleAudioPlay}>{isAudioPlaying ? '⏸' : '▶'}</button>
-            <span>{formatTime(audioStartTime)} - {formatTime(audioEndTime)}</span>
-          </div>
-          <div className="trim-section">
-            <div className="trim-label">Trim Start</div>
-            <input type="range" min={0} max={audioDuration} step={0.1} value={audioStartTime} className="trim-handle" onChange={handleTrimStartChange} />
-            <div className="trim-label">Trim End</div>
-            <input type="range" min={0} max={audioDuration} step={0.1} value={audioEndTime} className="trim-handle" onChange={handleTrimEndChange} />
-            <div className="trim-duration">{formatTime(audioEndTime - audioStartTime)} selected</div>
+      {showMusicSheet && (
+        <div className="music-sheet-overlay" onClick={() => setShowMusicSheet(false)}>
+          <div className="music-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sheet-title">Add Music</div>
+            {!selectedAudio ? (
+              <div className="music-upload-area" onClick={() => audioInputRef.current && audioInputRef.current.click()}>
+                <div className="music-note-icon">🎵</div>
+                <div className="upload-text">Tap to select audio</div>
+              </div>
+            ) : (
+              <div className="music-selected">
+                <div className="audio-file-name">
+                  <span>{selectedAudio.name.length > 20 ? selectedAudio.name.slice(0, 17) + '…' : selectedAudio.name}</span>
+                  <button className="remove-audio-btn" onClick={removeAudio}>✕</button>
+                </div>
+                <div className="playback-preview">
+                  <button onClick={toggleAudioPlay}>{isAudioPlaying ? '⏸' : '▶'}</button>
+                  <span>{formatTime(audioStartTime)} - {formatTime(audioEndTime)}</span>
+                </div>
+                <div className="trim-section">
+                  <div className="trim-label">Trim Start</div>
+                  <input type="range" min={0} max={audioDuration} step={0.1} value={audioStartTime} className="trim-handle" onChange={handleTrimStartChange} />
+                  <div className="trim-label">Trim End</div>
+                  <input type="range" min={0} max={audioDuration} step={0.1} value={audioEndTime} className="trim-handle" onChange={handleTrimEndChange} />
+                  <div className="trim-duration">{formatTime(audioEndTime - audioStartTime)} selected</div>
+                </div>
+              </div>
+            )}
+            {audioError && <div className="error-message">{audioError}</div>}
+            <button className="done-btn" onClick={() => setShowMusicSheet(false)}>Done</button>
+            <input type="file" accept="audio/mpeg,audio/mp3,audio/aac,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,.mp3,.m4a,.aac,.wav,.ogg" ref={audioInputRef} style={{ display: 'none' }} onChange={handleAudioSelect} />
+            <audio ref={audioRef} src={audioURL} style={{ display: 'none' }} />
           </div>
         </div>
       )}
-      {audioError && <div className="error-message">{audioError}</div>}
-      <button className="done-btn" onClick={() => setShowMusicSheet(false)}>Done</button>
-      <input type="file" accept="audio/mpeg,audio/mp3,audio/aac,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,.mp3,.m4a,.aac,.wav,.ogg" ref={audioInputRef} style={{ display: 'none' }} onChange={handleAudioSelect} />
-      <audio ref={audioRef} src={audioURL} style={{ display: 'none' }} />
-    </div>
-  </div>
-)}
-{/* Speed Bottom Sheet */}
+      {/* Speed Bottom Sheet */}
       {showSpeedSheet && (
         <div className="speed-sheet-overlay" onClick={() => setShowSpeedSheet(false)}>
           <div className="speed-sheet" onClick={e => e.stopPropagation()}>
@@ -1351,13 +1453,13 @@ useEffect(() => {
 
             {/* Done Button */}
             <button className="effects-filters-done-btn" onClick={() => {
-                if (effectsFiltersTab === 'Filter') {
-                  setSelectedFilter(tempFilter);
-                } else {
-                  setSelectedEffect(tempEffect);
-                }
-                setShowEffectsFiltersSheet(false);
-              }}>
+              if (effectsFiltersTab === 'Filter') {
+                setSelectedFilter(tempFilter);
+              } else {
+                setSelectedEffect(tempEffect);
+              }
+              setShowEffectsFiltersSheet(false);
+            }}>
               Done
             </button>
           </div>
