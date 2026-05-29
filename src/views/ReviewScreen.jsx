@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 
 import './ReviewScreen.css';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { toBlobURL } from '@ffmpeg/util';
+import ffmpegCoreURL from '@ffmpeg/core?url';
+import ffmpegWasmURL from '@ffmpeg/core/wasm?url';
 
 const FILTERS = {
   None: 'none',
@@ -355,6 +357,61 @@ const ReviewScreen = ({ frames = [], onBack }) => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
+  const saveVideoToDevice = (videoBlob, fileName) => {
+    const videoURL = URL.createObjectURL(videoBlob);
+    const downloadLink = document.createElement('a');
+
+    downloadLink.href = videoURL;
+    downloadLink.download = fileName;
+    downloadLink.style.display = 'none';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    setTimeout(() => URL.revokeObjectURL(videoURL), 30000);
+  };
+
+  const saveProjectToIndexedDB = ({ id, videoBlob, thumbnailBlob, frameCount, duration, filter, effect }) => {
+    return new Promise((resolve, reject) => {
+      const dbReq = indexedDB.open('LifeOnFilmDB', 1);
+
+      dbReq.onupgradeneeded = function (event) {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('projects')) {
+          db.createObjectStore('projects', { keyPath: 'id' });
+        }
+      };
+
+      dbReq.onsuccess = function (event) {
+        const db = event.target.result;
+        const tx = db.transaction('projects', 'readwrite');
+        const store = tx.objectStore('projects');
+
+        store.put({
+          id,
+          name: 'Film ' + new Date(id).toLocaleDateString(),
+          videoBlob,
+          thumbnailBlob,
+          createdAt: id,
+          frameCount,
+          duration,
+          filter,
+          effect,
+        });
+
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(new Error('IndexedDB write failed: ' + tx.error));
+        };
+      };
+
+      dbReq.onerror = () => reject(new Error('IndexedDB open failed: ' + dbReq.error));
+    });
+  };
 
 
 
@@ -836,7 +893,7 @@ const ReviewScreen = ({ frames = [], onBack }) => {
         setExportProgress(Math.round(((i + 1) / totalFrames) * 40));
       }
 
-      // ── STEP 2: Initialise FFmpeg with CDN-loaded WASM (fix for v0.12+) ──
+      // ── STEP 2: Initialise FFmpeg with bundled WASM (fix for v0.12+) ──
       setExportProgress(42);
       const ffmpeg = new FFmpeg();
 
@@ -846,10 +903,9 @@ const ReviewScreen = ({ frames = [], onBack }) => {
         setExportProgress(42 + Math.round(progress * 48));
       });
 
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
       await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: await toBlobURL(ffmpegCoreURL, 'text/javascript'),
+        wasmURL: await toBlobURL(ffmpegWasmURL, 'application/wasm'),
       });
 
       // ── STEP 3: Write frame files into FFmpeg virtual FS ─────────────────
@@ -941,42 +997,34 @@ const ReviewScreen = ({ frames = [], onBack }) => {
       tctx.drawImage(firstImg, tx, ty, tw, th);
       const thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, 'image/jpeg', 0.92));
 
-      // ── STEP 8: Save to IndexedDB ─────────────────────────────────────────
-      const dbReq = indexedDB.open('LifeOnFilmDB', 1);
-      dbReq.onupgradeneeded = function (event) {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('projects')) {
-          db.createObjectStore('projects', { keyPath: 'id' });
-        }
-      };
-      dbReq.onsuccess = function (event) {
-        const db = event.target.result;
-        const tx = db.transaction('projects', 'readwrite');
-        const store = tx.objectStore('projects');
-        const now = Date.now();
-        store.put({
+      // ── STEP 8: Save to app storage and download to device ────────────────
+      const now = Date.now();
+      const fileStamp = new Date(now).toISOString().replace(/[:.]/g, '-');
+      const fileName = `life-on-film-${fileStamp}.mp4`;
+
+      saveVideoToDevice(videoBlob, fileName);
+
+      try {
+        await saveProjectToIndexedDB({
           id: now,
-          name: 'Film ' + new Date(now).toLocaleDateString(),
           videoBlob,
           thumbnailBlob: thumbBlob,
-          createdAt: now,
           frameCount: frameFiles.length,
           duration: orderedFrames.length * speed,
           filter: selectedFilter,
           effect: selectedEffect,
         });
-        tx.oncomplete = () => {
-          setExportProgress(100);
-          setTimeout(() => {
-            setIsExporting(false);
-            setToastMessage('Film saved to your projects 🎞️');
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 3500);
-          }, 600);
-        };
-        tx.onerror = (e) => { throw new Error('IndexedDB write failed: ' + e.target.error); };
-      };
-      dbReq.onerror = (e) => { throw new Error('IndexedDB open failed: ' + e.target.error); };
+      } catch (dbErr) {
+        console.warn('Video downloaded, but project storage failed:', dbErr);
+      }
+
+      setExportProgress(100);
+      setTimeout(() => {
+        setIsExporting(false);
+        setToastMessage('Video saved to device');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3500);
+      }, 600);
 
     } catch (err) {
       console.error('Export failed:', err);
